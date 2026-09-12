@@ -42,7 +42,7 @@ export default function Navbar({ onOpenSearch }) {
 
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Mobile Menu Button */}
-        <div className="lg:hidden flex items-center">
+        <div className="lg:hidden flex items-center shrink-0">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="text-ivory hover:text-gold p-2 transition-colors"
@@ -53,17 +53,17 @@ export default function Navbar({ onOpenSearch }) {
         </div>
 
         {/* Brand */}
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
           <img
             src="/images/logo.png"
             alt="KATHRAZ"
-            className="h-10 w-auto object-contain"
+            className="h-8 sm:h-10 w-auto object-contain hidden min-[420px]:block"
           />
-          <div className="flex flex-col leading-none">
-            <span className="font-cinzel text-xl sm:text-2xl font-semibold tracking-[0.3em] text-ivory">
+          <div className="flex flex-col leading-none min-w-0">
+            <span className="font-cinzel text-lg sm:text-2xl font-semibold tracking-[0.15em] sm:tracking-[0.3em] text-ivory whitespace-nowrap">
               KATHRAZ
             </span>
-            <span className="text-[9px] tracking-[0.4em] text-muted uppercase mt-1">
+            <span className="text-[9px] tracking-[0.4em] text-muted uppercase mt-1 hidden sm:block">
               Fragrances
             </span>
           </div>
@@ -84,7 +84,7 @@ export default function Navbar({ onOpenSearch }) {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center space-x-3 sm:space-x-4">
+        <div className="flex items-center space-x-1 sm:space-x-4 shrink-0">
           {/* Currency Switcher */}
           <div className="relative hidden sm:flex items-center text-xs text-muted">
             <Globe className="w-3.5 h-3.5 mr-1.5 text-muted" />
@@ -108,10 +108,10 @@ export default function Navbar({ onOpenSearch }) {
             <Search className="w-5 h-5" />
           </button>
 
-          {/* Wishlist */}
+          {/* Wishlist — moved to drawer on phones to avoid crowding the bar */}
           <Link
             to="/shop?wishlist=true"
-            className="p-2 text-ivory/70 hover:text-ivory transition-colors relative"
+            className="hidden sm:block p-2 text-ivory/70 hover:text-ivory transition-colors relative"
             title="Wishlist"
           >
             <Heart className="w-5 h-5" />
@@ -136,8 +136,8 @@ export default function Navbar({ onOpenSearch }) {
             )}
           </button>
 
-          {/* Account Dropdown */}
-          <div className="relative">
+          {/* Account Dropdown — moved to drawer on phones */}
+          <div className="hidden sm:block relative">
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="p-2 text-ivory/70 hover:text-ivory transition-colors"
@@ -224,8 +224,33 @@ export default function Navbar({ onOpenSearch }) {
           <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Our Story</Link>
           <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">FAQ & Support</Link>
           <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Track an Order</Link>
-          {isAdmin && (
-            <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Admin</Link>
+          <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">
+            My Wishlist{wishlistCount > 0 ? ` (${wishlistCount})` : ''}
+          </Link>
+          <div className="border-t border-ivory/10 my-2" />
+          {user ? (
+            <>
+              <div className="py-1 text-xs text-muted">{user.name}</div>
+              <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">My Orders</Link>
+              {isAdmin && (
+                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Admin</Link>
+              )}
+              <button
+                onClick={() => {
+                  logout();
+                  setIsMobileMenuOpen(false);
+                  navigate('/');
+                }}
+                className="block w-full text-left py-2.5 text-muted hover:text-ivory"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Sign In</Link>
+              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Create Account</Link>
+            </>
           )}
         </div>
       )}
