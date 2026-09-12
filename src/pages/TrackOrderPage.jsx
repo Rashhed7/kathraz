@@ -110,7 +110,7 @@ export default function TrackOrderPage() {
           {/* Visual Step Bar */}
           <div className="space-y-4">
             <h3 className="text-xs text-gold uppercase tracking-wider font-semibold">Delivery Timeline Progression</h3>
-            <div className="relative flex items-center justify-between px-4">
+            <div className="relative flex items-center justify-between px-1 sm:px-4">
               <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-1 bg-gold/20 -z-0">
                 <div
                   className="bg-gold h-full transition-all duration-700"
@@ -122,9 +122,9 @@ export default function TrackOrderPage() {
                 const currentIdx = getStepIndex(order.order_status);
                 const isDone = idx <= currentIdx;
                 return (
-                  <div key={step} className="relative z-10 flex flex-col items-center gap-1 text-center">
+                  <div key={step} className="relative z-10 flex flex-col items-center gap-1 text-center min-w-0">
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all border-2 ${
+                      className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-all border-2 ${
                         isDone
                           ? 'bg-gold border-gold text-charcoal shadow-lg shadow-gold/30'
                           : 'bg-obsidian border-gold/30 text-muted'
@@ -132,7 +132,7 @@ export default function TrackOrderPage() {
                     >
                       {idx + 1}
                     </div>
-                    <span className={`text-[11px] font-medium mt-1 ${isDone ? 'text-gold' : 'text-muted'}`}>
+                    <span className={`text-[9px] sm:text-[11px] font-medium mt-1 ${isDone ? 'text-gold' : 'text-muted'}`}>
                       {step}
                     </span>
                   </div>

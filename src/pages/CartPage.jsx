@@ -58,7 +58,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
       <h1 className="font-cinzel text-3xl font-bold text-ivory">Your Shopping Bag</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -82,7 +82,7 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between w-full sm:w-auto gap-6">
+              <div className="flex items-center justify-between flex-wrap w-full sm:w-auto gap-3 sm:gap-6">
                 <div className="flex items-center border border-gold/20 rounded bg-card text-xs">
                   <button
                     onClick={() => updateQuantity(item.variant_id, item.quantity - 1)}

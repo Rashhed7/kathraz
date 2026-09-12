@@ -145,7 +145,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
       <div className="flex items-center justify-between border-b border-gold/15 pb-4">
         <h1 className="font-cinzel text-3xl font-bold text-ivory">Checkout</h1>
         <span className="text-xs text-gold flex items-center gap-1">

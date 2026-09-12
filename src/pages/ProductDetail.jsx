@@ -135,7 +135,7 @@ export default function ProductDetail() {
         {/* Right Product Details */}
         <div className="lg:col-span-6 space-y-6">
           <div>
-            <div className="flex items-center justify-between text-xs text-gold uppercase tracking-widest font-semibold">
+            <div className="flex items-center justify-between gap-2 text-xs text-gold uppercase tracking-widest font-semibold flex-wrap">
               <span>{product.category_name} • {product.gender}</span>
               <span className="text-emerald-400 flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" /> In Stock (Batch #902)
@@ -243,7 +243,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Value Badges */}
-          <div className="grid grid-cols-2 gap-4 pt-2 text-[11px] text-muted">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2 text-[11px] text-muted">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-gold" /> Free Express Courier over ₹5,000
             </div>
@@ -256,7 +256,7 @@ export default function ProductDetail() {
 
       {/* Tabs: Olfactory Pyramid / Artisanal Craft / Reviews */}
       <div className="space-y-8 border-t border-gold/15 pt-12">
-        <div className="flex border-b border-gold/20 gap-8 text-sm font-cinzel tracking-wider uppercase font-semibold">
+        <div className="flex flex-wrap border-b border-gold/20 gap-4 sm:gap-8 text-xs sm:text-sm font-cinzel tracking-wider uppercase font-semibold">
           <button
             onClick={() => setActiveTab('notes')}
             className={`pb-3 border-b-2 transition-all ${
