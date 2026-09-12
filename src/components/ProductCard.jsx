@@ -41,11 +41,11 @@ export default function ProductCard({ product, onQuickView }) {
           />
         </Link>
 
-        {/* Quick view on hover */}
+        {/* Quick view — always visible on touch (no hover), hover-reveal on desktop */}
         {onQuickView && (
           <button
             onClick={() => onQuickView(product)}
-            className="absolute inset-x-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-obsidian/95 text-ivory text-xs font-medium py-2.5 hover:bg-ivory hover:text-obsidian"
+            className="absolute inset-x-4 bottom-4 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 bg-obsidian/95 text-ivory text-xs font-medium py-2.5 hover:bg-ivory hover:text-obsidian"
           >
             Quick View
           </button>

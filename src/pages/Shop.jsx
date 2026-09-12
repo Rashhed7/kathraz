@@ -21,6 +21,16 @@ export default function Shop() {
   const [sortBy, setSortBy] = useState('recommended');
   const [viewMode, setViewMode] = useState('grid');
   const [showWishlistOnly, setShowWishlistOnly] = useState(searchParams.get('wishlist') === 'true');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Active filter count for the mobile filters button
+  const activeFilterCount = [
+    selectedCategory,
+    selectedGender,
+    selectedConcentration,
+    searchQuery,
+    maxPrice < 25000 ? 'price' : '',
+  ].filter(Boolean).length;
 
   const { wishlist } = useWishlist();
 
@@ -87,7 +97,7 @@ export default function Shop() {
     : products;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
       {/* Header Banner */}
       <div className="relative rounded-2xl bg-card border border-gold/20 p-8 sm:p-12 overflow-hidden shadow-2xl glass-panel">
         <div className="relative z-10 max-w-2xl space-y-3">
@@ -106,7 +116,7 @@ export default function Shop() {
       {/* Main Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Filters Sidebar */}
-        <aside className="lg:col-span-3 bg-card border border-gold/20 rounded-2xl p-6 space-y-6 glass-panel sticky top-24">
+        <aside className={`${showFilters ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-card border border-gold/20 rounded-2xl p-6 space-y-6 glass-panel lg:sticky lg:top-24`}>
           <div className="flex items-center justify-between border-b border-gold/15 pb-4">
             <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-ivory">
               <SlidersHorizontal className="w-4 h-4 text-gold" /> Filter Library
@@ -182,7 +192,7 @@ export default function Shop() {
           <div className="space-y-2 pt-2 border-t border-gold/15">
             <div className="flex justify-between text-xs">
               <span className="text-muted font-semibold uppercase">Max Price</span>
-              <span className="text-gold font-serif font-bold">₹{maxPrice.toLocaleString()}</span>
+              <span className="text-gold font-num font-bold">₹{maxPrice.toLocaleString()}</span>
             </div>
             <input
               type="range"
@@ -212,17 +222,31 @@ export default function Shop() {
         {/* Product Grid Area */}
         <main className="lg:col-span-9 space-y-6">
           {/* Top Sort & View Bar */}
-          <div className="bg-card border border-gold/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <span className="text-xs text-muted">
-              Showing <strong className="text-gold">{displayedProducts.length}</strong> creations
-            </span>
+          <div className="bg-card border border-gold/20 rounded-xl p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted">
+                Showing <strong className="text-gold">{displayedProducts.length}</strong> creations
+              </span>
+              {/* Mobile: collapsible filters */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`lg:hidden flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-gold/20 border-gold/40 text-gold'
+                    : 'border-gold/30 text-muted hover:text-ivory'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </button>
+            </div>
 
             <div className="flex items-center gap-4">
               {/* Sort By Dropdown */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2 rounded-lg focus:outline-none focus:border-gold"
+                className="w-full bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2 rounded-lg focus:outline-none focus:border-gold"
               >
                 <option value="recommended">Sort by: Featured</option>
                 <option value="price_asc">Price: Low to High</option>
