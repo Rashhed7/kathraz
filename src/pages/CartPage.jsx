@@ -48,7 +48,7 @@ export default function CartPage() {
         <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mx-auto border border-gold/20">
           <ShoppingBag className="w-8 h-8 text-gold" />
         </div>
-        <h2 className="font-cinzel text-2xl font-bold text-ivory">Your Fragrance Bag is Empty</h2>
+        <h2 className="font-sans text-2xl font-bold text-ivory">Your Fragrance Bag is Empty</h2>
         <p className="text-xs text-muted">Discover our collection of Extrait de Parfums and home atmospheres.</p>
         <Link to="/shop" className="btn-gold inline-block px-8 py-3 rounded-lg text-xs uppercase font-bold tracking-wider">
           Explore Treasury
@@ -59,7 +59,7 @@ export default function CartPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
-      <h1 className="font-cinzel text-3xl font-bold text-ivory">Your Shopping Bag</h1>
+      <h1 className="font-sans text-3xl font-bold text-ivory">Your Shopping Bag</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Cart Table */}
@@ -76,7 +76,7 @@ export default function CartPage() {
                   className="w-20 h-20 object-cover rounded-lg border border-gold/20"
                 />
                 <div>
-                  <h3 className="font-serif font-bold text-base text-ivory">{item.title}</h3>
+                  <h3 className="font-sans font-bold text-base text-ivory">{item.title}</h3>
                   <span className="text-xs text-gold block">{item.size_label}</span>
                   <span className="text-xs text-muted block mt-1">{formatPrice(item.price)} each</span>
                 </div>
@@ -116,7 +116,7 @@ export default function CartPage() {
 
         {/* Summary Card */}
         <div className="lg:col-span-4 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-6">
-          <h2 className="font-cinzel text-lg font-bold text-ivory border-b border-gold/15 pb-3">Order Summary</h2>
+          <h2 className="font-sans text-lg font-bold text-ivory border-b border-gold/15 pb-3">Order Summary</h2>
 
           {/* Coupon Code */}
           <div className="space-y-2">
@@ -158,7 +158,7 @@ export default function CartPage() {
               <span>{shippingINR === 0 ? <strong className="text-gold">FREE</strong> : formatPrice(shippingINR)}</span>
             </div>
             <div className="flex justify-between text-base font-bold text-ivory pt-3 border-t border-gold/15">
-              <span className="font-cinzel">Total</span>
+              <span className="font-sans">Total</span>
               <span className="font-num text-xl text-gold">{formatPrice(totalINR)}</span>
             </div>
           </div>

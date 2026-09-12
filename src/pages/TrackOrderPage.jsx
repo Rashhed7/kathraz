@@ -53,7 +53,7 @@ export default function TrackOrderPage() {
         <span className="text-xs uppercase tracking-widest text-gold font-semibold flex items-center justify-center gap-1">
           <Truck className="w-4 h-4" /> Courier
         </span>
-        <h1 className="font-cinzel text-3xl sm:text-4xl font-bold text-ivory">Live Order Tracking</h1>
+        <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">Live Order Tracking</h1>
         <p className="text-xs text-muted font-light max-w-md mx-auto">
           Enter your KATHRAZ Order Number (e.g. KTZ-89210), Tracking Code, or Email address to inspect real-time courier progress.
         </p>

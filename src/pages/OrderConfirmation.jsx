@@ -40,7 +40,7 @@ export default function OrderConfirmation() {
         <span className="text-xs uppercase tracking-[0.25em] text-gold font-semibold flex items-center justify-center gap-1">
           Order Confirmed
         </span>
-        <h1 className="font-cinzel text-3xl sm:text-4xl font-bold text-ivory">Thank you for your order</h1>
+        <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">Thank you for your order</h1>
         <p className="text-xs text-muted font-light max-w-md mx-auto">
           Your order has been recorded in the KATHRAZ vault. An official invoice and courier tracking details have been dispatched to your email.
         </p>
@@ -82,7 +82,7 @@ export default function OrderConfirmation() {
             {order.items && order.items.map((item) => (
               <div key={item.id} className="flex justify-between items-center text-xs p-2 rounded bg-obsidian border border-gold/10">
                 <div>
-                  <span className="font-bold text-ivory font-serif">{item.product_title}</span>
+                  <span className="font-bold text-ivory font-sans">{item.product_title}</span>
                   <span className="text-gold block text-[10px]">{item.size_label} x {item.quantity}</span>
                 </div>
                 <span className="font-num font-bold text-gold">{formatPrice(item.total)}</span>
@@ -91,7 +91,7 @@ export default function OrderConfirmation() {
           </div>
 
           <div className="flex justify-between items-center text-sm font-bold text-ivory pt-3 border-t border-gold/15">
-            <span className="font-cinzel">Total Amount Paid</span>
+            <span className="font-sans">Total Amount Paid</span>
             <span className="font-num text-xl text-gold">{formatPrice(order.total_amount)}</span>
           </div>
         </div>

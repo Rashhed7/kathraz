@@ -316,7 +316,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2 text-gold text-xs font-semibold uppercase tracking-widest">
             <Shield className="w-4 h-4" /> KATHRAZ Admin
           </div>
-          <h1 className="font-cinzel text-3xl font-bold text-ivory">Dashboard</h1>
+          <h1 className="font-sans text-3xl font-bold text-ivory">Dashboard</h1>
         </div>
 
         <button
@@ -385,7 +385,7 @@ export default function AdminDashboard() {
 
           {/* Recent Orders Overview */}
           <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-4">
-            <h3 className="font-cinzel text-lg font-bold text-ivory">Recent Orders Feed</h3>
+            <h3 className="font-sans text-lg font-bold text-ivory">Recent Orders Feed</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -401,7 +401,7 @@ export default function AdminDashboard() {
                   {recentOrders.map((ord) => (
                     <tr key={ord.id} className="hover:bg-gold/5">
                       <td className="py-3 px-4 font-num text-gold font-bold">{ord.order_number}</td>
-                      <td className="py-3 px-4 text-ivory font-serif">{ord.customer_name}</td>
+                      <td className="py-3 px-4 text-ivory font-sans">{ord.customer_name}</td>
                       <td className="py-3 px-4 font-num font-bold text-gold">{formatPrice(ord.total_amount)}</td>
                       <td className="py-3 px-4">
                         <span className="px-2.5 py-1 bg-gold/20 text-gold rounded font-bold uppercase text-[10px]">
@@ -422,7 +422,7 @@ export default function AdminDashboard() {
       {activeTab === 'products' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="flex justify-between items-center">
-            <h2 className="font-cinzel text-xl font-bold text-ivory">Catalog Management</h2>
+            <h2 className="font-sans text-xl font-bold text-ivory">Catalog Management</h2>
             <button
               onClick={openAddProductModal}
               className="btn-gold px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg"
@@ -438,7 +438,7 @@ export default function AdminDashboard() {
                   <img src={p.image_url} alt={p.title} className="w-20 h-20 object-cover rounded-xl border border-gold/20" />
                   <div className="flex-1">
                     <span className="text-[10px] uppercase text-gold font-bold block">{p.concentration}</span>
-                    <h3 className="font-serif font-bold text-base text-ivory">{p.title}</h3>
+                    <h3 className="font-sans font-bold text-base text-ivory">{p.title}</h3>
                     <div className="font-num font-bold text-gold mt-1">{formatPrice(p.base_price)}</div>
                   </div>
                 </div>
@@ -473,7 +473,7 @@ export default function AdminDashboard() {
       {activeTab === 'orders' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h2 className="font-cinzel text-xl font-bold text-ivory">All Orders</h2>
+            <h2 className="font-sans text-xl font-bold text-ivory">All Orders</h2>
             <a
               href="/invoice-all"
               className="btn-outline-gold px-5 py-2.5 text-xs uppercase tracking-wider flex items-center gap-2"
@@ -510,7 +510,7 @@ export default function AdminDashboard() {
                       </a>
                     </td>
                     <td className="py-3 px-4">
-                      <strong className="text-ivory block font-serif">{ord.customer_name}</strong>
+                      <strong className="text-ivory block font-sans">{ord.customer_name}</strong>
                       <span className="text-muted block text-[11px]">{ord.customer_email}</span>
                       <span className="text-gold block text-[10px]">{ord.phone}</span>
                     </td>
@@ -544,7 +544,7 @@ export default function AdminDashboard() {
       {/* TAB 4: CUSTOMERS */}
       {activeTab === 'customers' && (
         <div className="space-y-6 animate-fadeIn">
-          <h2 className="font-cinzel text-xl font-bold text-ivory">Customers</h2>
+          <h2 className="font-sans text-xl font-bold text-ivory">Customers</h2>
           <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -559,7 +559,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-gold/10">
                 {customers.map((c) => (
                   <tr key={c.id} className="hover:bg-gold/5">
-                    <td className="py-3 px-4 font-serif font-bold text-ivory">{c.name}</td>
+                    <td className="py-3 px-4 font-sans font-bold text-ivory">{c.name}</td>
                     <td className="py-3 px-4 font-num text-muted">{c.email}</td>
                     <td className="py-3 px-4 text-gold">{c.phone}</td>
                     <td className="py-3 px-4 font-bold text-ivory">{c.total_orders}</td>
@@ -578,7 +578,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
             {/* Create Coupon Form */}
             <form onSubmit={handleAddCoupon} className="md:col-span-4 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-4 text-xs">
-              <h3 className="font-cinzel text-base font-bold text-gold">Create Coupon</h3>
+              <h3 className="font-sans text-base font-bold text-gold">Create Coupon</h3>
 
               <div>
                 <label className="text-muted block mb-1">Coupon Code</label>
@@ -633,7 +633,7 @@ export default function AdminDashboard() {
 
             {/* Coupons List */}
             <div className="md:col-span-8 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-4">
-              <h3 className="font-cinzel text-base font-bold text-ivory">Active Coupons</h3>
+              <h3 className="font-sans text-base font-bold text-ivory">Active Coupons</h3>
               <div className="divide-y divide-gold/10">
                 {coupons.map((cop) => (
                   <div key={cop.id} className="flex items-center justify-between py-3 text-xs">
@@ -662,7 +662,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-obsidian/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-card border border-gold/40 rounded-2xl p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gold/20 pb-4">
-              <h3 className="font-cinzel text-lg font-bold text-gold">
+              <h3 className="font-sans text-lg font-bold text-gold">
                 {editingProduct ? 'Edit Fragrance Formulation' : 'Create New Fragrance'}
               </h3>
               <button onClick={() => setShowProductModal(false)} className="text-muted hover:text-ivory">

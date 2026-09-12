@@ -69,7 +69,7 @@ export default function RazorpayModal({ isOpen, orderDetails, onSuccess, onClose
             <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-400 flex items-center justify-center mx-auto text-emerald-600">
               <CheckCircle2 className="w-10 h-10 animate-bounce" />
             </div>
-            <h3 className="font-cinzel text-xl font-bold text-ivory">Payment successful</h3>
+            <h3 className="font-sans text-xl font-bold text-ivory">Payment successful</h3>
             <p className="text-xs text-muted font-light">
               Your transaction has been securely processed via Razorpay API. Generating your invoice...
             </p>

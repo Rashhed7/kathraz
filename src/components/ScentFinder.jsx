@@ -44,7 +44,7 @@ export default function ScentFinder({ products, onSelectProduct }) {
   return (
     <div className="bg-card border border-ivory/10 p-6 sm:p-10">
       <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-2">Not sure where to start</p>
-      <h2 className="font-serif text-2xl sm:text-3xl font-medium text-ivory">
+      <h2 className="font-sans text-2xl sm:text-3xl font-medium text-ivory">
         Three questions, one recommendation
       </h2>
 
@@ -65,7 +65,7 @@ export default function ScentFinder({ products, onSelectProduct }) {
       {/* Step 1 */}
       {step === 1 && (
         <div className="space-y-4 animate-fadeIn">
-          <h3 className="font-serif text-lg text-ivory">What kind of presence do you want?</h3>
+          <h3 className="font-sans text-lg text-ivory">What kind of presence do you want?</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'Dark and commanding', value: 'Regal', desc: 'Agarwood, smoke, incense' },
@@ -89,7 +89,7 @@ export default function ScentFinder({ products, onSelectProduct }) {
       {/* Step 2 */}
       {step === 2 && (
         <div className="space-y-4 animate-fadeIn">
-          <h3 className="font-serif text-lg text-ivory">Which materials pull you in?</h3>
+          <h3 className="font-sans text-lg text-ivory">Which materials pull you in?</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'Oud & leather', value: 'Oud', desc: 'Deep, woody, lingering' },
@@ -113,7 +113,7 @@ export default function ScentFinder({ products, onSelectProduct }) {
       {/* Step 3 */}
       {step === 3 && (
         <div className="space-y-4 animate-fadeIn">
-          <h3 className="font-serif text-lg text-ivory">When will you wear it?</h3>
+          <h3 className="font-sans text-lg text-ivory">When will you wear it?</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'Evenings out', value: 'Evening', desc: 'Strong projection, long wear' },
@@ -155,7 +155,7 @@ export default function ScentFinder({ products, onSelectProduct }) {
             />
             <div className="space-y-1.5 flex-1 text-center sm:text-left">
               <span className="text-[10px] uppercase tracking-[0.15em] text-muted">{recommendation.concentration}</span>
-              <h3 className="font-serif text-xl text-ivory">{recommendation.title}</h3>
+              <h3 className="font-sans text-xl text-ivory">{recommendation.title}</h3>
               <p className="text-xs text-muted font-light line-clamp-2 max-w-md">{recommendation.description}</p>
               <div className="text-sm text-ivory pt-1">
                 {formatPrice(recommendation.base_price)}

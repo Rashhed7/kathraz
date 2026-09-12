@@ -24,7 +24,7 @@ export default function ContactPage() {
         <span className="text-[11px] uppercase tracking-[0.25em] text-muted">
           We usually reply within a few hours
         </span>
-        <h1 className="font-serif text-3xl sm:text-4xl font-medium text-ivory">Contact Us</h1>
+        <h1 className="font-sans text-3xl sm:text-4xl font-medium text-ivory">Contact Us</h1>
         <p className="text-xs text-muted font-light max-w-md mx-auto">
           Questions about an order, a fragrance, or gifting? The fastest way to
           reach us is WhatsApp.
@@ -37,7 +37,7 @@ export default function ContactPage() {
           {submitted ? (
             <div className="p-8 text-center space-y-4">
               <CheckCircle2 className="w-12 h-12 text-gold mx-auto" />
-              <h3 className="font-serif text-xl font-medium text-ivory">Message sent</h3>
+              <h3 className="font-sans text-xl font-medium text-ivory">Message sent</h3>
               <p className="text-xs text-muted">
                 Thank you — we'll get back to you shortly. For anything urgent,
                 WhatsApp is fastest.
@@ -96,7 +96,7 @@ export default function ContactPage() {
         {/* Direct Contact */}
         <div className="md:col-span-5 space-y-6">
           <div className="bg-card border border-ivory/10 p-6 space-y-4 text-xs">
-            <h3 className="font-serif text-lg font-medium text-ivory">Talk to us directly</h3>
+            <h3 className="font-sans text-lg font-medium text-ivory">Talk to us directly</h3>
 
             <a
               href={WHATSAPP_URL}

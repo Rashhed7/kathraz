@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-2">
         <img src="/images/logo.png" alt="Logo" className="h-16 w-auto mx-auto object-contain drop-shadow-lg" />
-        <h1 className="font-cinzel text-2xl font-bold text-ivory">KATHRAZ Client Login</h1>
+        <h1 className="font-sans text-2xl font-bold text-ivory">KATHRAZ Client Login</h1>
         <p className="text-xs text-muted font-light">Access your order history and private membership</p>
       </div>
 

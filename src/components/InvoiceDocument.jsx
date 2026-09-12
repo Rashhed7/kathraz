@@ -63,7 +63,7 @@ export default function InvoiceDocument({ order }) {
         <div style={{ fontSize: 9, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#9C7A3C', fontWeight: 700, marginBottom: 8 }}>
           Deliver To
         </div>
-        <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 700, color: '#2B2118', lineHeight: 1.2 }}>
+        <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 22, fontWeight: 700, color: '#2B2118', lineHeight: 1.2 }}>
           {order.customer_name}
         </div>
         <div style={{ fontSize: 13, color: '#2B2118', marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-line' }}>

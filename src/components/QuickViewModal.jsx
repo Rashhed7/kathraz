@@ -42,7 +42,7 @@ export default function QuickViewModal({ product, onClose }) {
             <span className="text-xs uppercase tracking-widest text-gold font-medium">
               {product.concentration}
             </span>
-            <h2 className="font-serif text-2xl font-bold text-ivory mt-1">{product.title}</h2>
+            <h2 className="font-sans text-2xl font-bold text-ivory mt-1">{product.title}</h2>
             <p className="text-xs text-muted mt-1 font-light">{product.subtitle}</p>
 
             {/* Rating */}

@@ -32,7 +32,7 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-4 py-12 space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="font-cinzel text-2xl font-bold text-ivory">Join KATHRAZ Membership</h1>
+        <h1 className="font-sans text-2xl font-bold text-ivory">Join KATHRAZ Membership</h1>
         <p className="text-xs text-muted font-light">Create a private account for order tracking & bespoke sampling</p>
       </div>
 

@@ -86,7 +86,7 @@ export default function CheckoutPage() {
   if (cart.length === 0) {
     return (
       <div className="max-w-md mx-auto py-24 text-center space-y-4">
-        <h2 className="font-cinzel text-2xl font-bold text-ivory">No Active Items to Checkout</h2>
+        <h2 className="font-sans text-2xl font-bold text-ivory">No Active Items to Checkout</h2>
         <button onClick={() => navigate('/shop')} className="btn-gold px-6 py-2.5 text-xs font-bold uppercase">Return to Store</button>
       </div>
     );
@@ -147,7 +147,7 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
       <div className="flex items-center justify-between border-b border-gold/15 pb-4">
-        <h1 className="font-cinzel text-3xl font-bold text-ivory">Checkout</h1>
+        <h1 className="font-sans text-3xl font-bold text-ivory">Checkout</h1>
         <span className="text-xs text-gold flex items-center gap-1">
           <ShieldCheck className="w-4 h-4" /> 256-Bit Encrypted
         </span>
@@ -156,7 +156,7 @@ export default function CheckoutPage() {
       <form onSubmit={handleCreateOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Shipping & Contact Info */}
         <div className="lg:col-span-7 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-6">
-          <h2 className="font-cinzel text-lg font-bold text-ivory flex items-center gap-2 border-b border-gold/15 pb-3">
+          <h2 className="font-sans text-lg font-bold text-ivory flex items-center gap-2 border-b border-gold/15 pb-3">
             <MapPin className="w-5 h-5 text-gold" /> Shipping Address & Contact
           </h2>
 
@@ -212,7 +212,7 @@ export default function CheckoutPage() {
 
           {/* Payment Method Selector */}
           <div className="pt-4 border-t border-gold/15 space-y-3">
-            <h2 className="font-cinzel text-lg font-bold text-ivory flex items-center gap-2">
+            <h2 className="font-sans text-lg font-bold text-ivory flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-gold" /> Payment Method
             </h2>
 
@@ -259,7 +259,7 @@ export default function CheckoutPage() {
 
         {/* Order Summary Right */}
         <div className="lg:col-span-5 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-4">
-          <h2 className="font-cinzel text-lg font-bold text-ivory border-b border-gold/15 pb-3">Items in Order</h2>
+          <h2 className="font-sans text-lg font-bold text-ivory border-b border-gold/15 pb-3">Items in Order</h2>
 
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
             {cart.map((item) => (
@@ -267,7 +267,7 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-3">
                   <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover rounded border border-gold/20" />
                   <div>
-                    <h4 className="font-serif font-bold text-ivory">{item.title}</h4>
+                    <h4 className="font-sans font-bold text-ivory">{item.title}</h4>
                     <span className="text-muted block text-[10px]">{item.size_label} x {item.quantity}</span>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export default function CheckoutPage() {
               <span>{shippingINR === 0 ? <strong className="text-gold">FREE</strong> : formatPrice(shippingINR)}</span>
             </div>
             <div className="flex justify-between text-lg font-bold text-ivory pt-3 border-t border-gold/15">
-              <span className="font-cinzel">Total</span>
+              <span className="font-sans">Total</span>
               <span className="font-num text-2xl text-gold">{formatPrice(totalINR)}</span>
             </div>
           </div>

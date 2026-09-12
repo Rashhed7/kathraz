@@ -41,7 +41,7 @@ export default function Home({ onOpenSearch }) {
         <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-6">
           Crafted in India · Est. 2026
         </p>
-        <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
+        <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
           Fine fragrances, thoughtfully made.
         </h1>
         <p className="mt-6 text-sm sm:text-[15px] text-ivory/70 font-light leading-relaxed max-w-xl mx-auto">
@@ -75,7 +75,7 @@ export default function Home({ onOpenSearch }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
               <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-3">The Collection</p>
-              <h2 className="font-serif text-3xl font-medium text-ivory">Personal Fragrances</h2>
+              <h2 className="font-sans text-3xl font-medium text-ivory">Personal Fragrances</h2>
             <p className="mt-4 text-sm text-ivory/70 font-light leading-relaxed max-w-md">
               Inspired interpretations of celebrated perfumes and original
               blends — extraits and attar oils for daily wear, in unisex
@@ -115,7 +115,7 @@ export default function Home({ onOpenSearch }) {
       {/* BEST SELLERS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="flex items-end justify-between border-b border-ivory/10 pb-5 mb-10">
-          <h2 className="font-serif text-3xl font-medium text-ivory">Bestsellers</h2>
+          <h2 className="font-sans text-3xl font-medium text-ivory">Bestsellers</h2>
           <Link
             to="/shop"
             className="text-xs uppercase tracking-[0.15em] text-muted hover:text-ivory transition-colors"
@@ -144,7 +144,7 @@ export default function Home({ onOpenSearch }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           <div className="lg:col-span-4">
             <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-3">Construction</p>
-            <h2 className="font-serif text-3xl font-medium text-ivory">How it develops</h2>
+            <h2 className="font-sans text-3xl font-medium text-ivory">How it develops</h2>
             <p className="mt-4 text-sm text-ivory/70 font-light leading-relaxed">
               Each composition unfolds in three stages as it warms on skin.
               What you smell at first spray is not what you'll smell at midnight —
@@ -166,7 +166,7 @@ export default function Home({ onOpenSearch }) {
                       : 'border-ivory/10 text-muted hover:text-ivory'
                   }`}
                 >
-                  <span className="font-serif text-lg">{label} notes</span>
+                  <span className="font-sans text-lg">{label} notes</span>
                   <span className="text-[11px]">{when}</span>
                 </button>
               ))}
@@ -177,7 +177,7 @@ export default function Home({ onOpenSearch }) {
             {activeNoteTab === 'top' && (
               <div className="animate-fadeIn">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-muted">First 30 minutes</p>
-                <h3 className="font-serif text-2xl text-ivory mt-2">Saffron, bergamot, cardamom</h3>
+                <h3 className="font-sans text-2xl text-ivory mt-2">Saffron, bergamot, cardamom</h3>
                 <p className="mt-5 text-sm text-ivory/70 font-light leading-relaxed max-w-xl">
                   Kashmiri saffron opens bright and slightly bitter, softened by
                   Sicilian bergamot. Guatemalan cardamom gives it a green,
@@ -188,7 +188,7 @@ export default function Home({ onOpenSearch }) {
             {activeNoteTab === 'heart' && (
               <div className="animate-fadeIn">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-muted">Hours 1–4</p>
-                <h3 className="font-serif text-2xl text-ivory mt-2">Taif rose, Cambodian oud, jasmine</h3>
+                <h3 className="font-sans text-2xl text-ivory mt-2">Taif rose, Cambodian oud, jasmine</h3>
                 <p className="mt-5 text-sm text-ivory/70 font-light leading-relaxed max-w-xl">
                   The core of the fragrance. Rose absolute from Taif carries a
                   honeyed darkness that pairs with the resinous, medicinal
@@ -199,7 +199,7 @@ export default function Home({ onOpenSearch }) {
             {activeNoteTab === 'base' && (
               <div className="animate-fadeIn">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-muted">Hours 4–16</p>
-                <h3 className="font-serif text-2xl text-ivory mt-2">Amber, leather, patchouli</h3>
+                <h3 className="font-sans text-2xl text-ivory mt-2">Amber, leather, patchouli</h3>
                 <p className="mt-5 text-sm text-ivory/70 font-light leading-relaxed max-w-xl">
                   What remains on fabric the next morning. Baltic amber resin
                   and a quiet leather accord, grounded with dark patchouli and
@@ -214,7 +214,7 @@ export default function Home({ onOpenSearch }) {
       {/* REVIEWS — restrained, plausible */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="border-b border-ivory/10 pb-5 mb-10">
-          <h2 className="font-serif text-3xl font-medium text-ivory">From our customers</h2>
+          <h2 className="font-sans text-3xl font-medium text-ivory">From our customers</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

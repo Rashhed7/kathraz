@@ -64,7 +64,7 @@ export default function CartDrawer() {
           <div className="p-6 border-b border-gold/15 flex items-center justify-between bg-obsidian">
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-gold" />
-              <h2 className="font-cinzel text-lg font-bold tracking-wider text-ivory">Your Fragrance Bag</h2>
+              <h2 className="font-sans text-lg font-bold tracking-wider text-ivory">Your Fragrance Bag</h2>
             </div>
             <button
               onClick={() => setIsCartOpen(false)}
@@ -127,7 +127,7 @@ export default function CartDrawer() {
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-serif font-bold text-sm text-ivory leading-tight">{item.title}</h4>
+                        <h4 className="font-sans font-bold text-sm text-ivory leading-tight">{item.title}</h4>
                         <button
                           onClick={() => removeFromCart(item.variant_id)}
                           className="text-muted hover:text-red-400 p-1 transition-colors"
@@ -236,7 +236,7 @@ export default function CartDrawer() {
                   <span>{shippingINR === 0 ? <strong className="text-gold font-semibold">FREE</strong> : formatPrice(shippingINR)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold text-ivory pt-2 border-t border-gold/15">
-                  <span className="font-cinzel tracking-wider">Total</span>
+                  <span className="font-sans tracking-wider">Total</span>
                   <span className="font-num text-lg text-gold">{formatPrice(totalINR)}</span>
                 </div>
               </div>

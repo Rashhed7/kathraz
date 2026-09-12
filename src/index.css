@@ -22,13 +22,15 @@ body {
   overflow-x: hidden;
 }
 
-h1, h2, h3, h4, .font-serif {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+h1, h2, h3, h4 {
+  /* Headings use the same clean sans as the body — professional and consistent.
+     Cinzel is reserved for the KATHRAZ wordmark only. */
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 /* Numbers — prices, totals, quantities.
- * Sans-serif with lining, tabular figures so digits align and
- * don't inherit the serif's old-style (descending) numerals. */
+ * Sans-serif with lining, tabular figures so digits align cleanly. */
 .font-num {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-variant-numeric: lining-nums tabular-nums;

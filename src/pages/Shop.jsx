@@ -104,7 +104,7 @@ export default function Shop() {
           <span className="text-xs uppercase tracking-[0.25em] text-gold font-semibold flex items-center gap-1">
             KATHRAZ Parfumerie Treasury
           </span>
-          <h1 className="font-cinzel text-3xl sm:text-4xl font-bold text-ivory">
+          <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">
             {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Collection' : 'All Fragrances'}
           </h1>
           <p className="text-xs text-muted font-light leading-relaxed">
@@ -118,7 +118,7 @@ export default function Shop() {
         {/* Filters Sidebar */}
         <aside className={`${showFilters ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-card border border-gold/20 rounded-2xl p-6 space-y-6 glass-panel lg:sticky lg:top-24`}>
           <div className="flex items-center justify-between border-b border-gold/15 pb-4">
-            <div className="flex items-center gap-2 font-cinzel font-bold text-sm text-ivory">
+            <div className="flex items-center gap-2 font-sans font-bold text-sm text-ivory">
               <SlidersHorizontal className="w-4 h-4 text-gold" /> Filter Library
             </div>
             <button

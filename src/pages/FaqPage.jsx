@@ -33,7 +33,7 @@ export default function FaqPage() {
         <span className="text-xs uppercase tracking-widest text-gold font-semibold flex items-center justify-center gap-1">
           <HelpCircle className="w-4 h-4" /> Frequently Asked Questions
         </span>
-        <h1 className="font-cinzel text-3xl font-bold text-ivory">Frequently Asked Questions</h1>
+        <h1 className="font-sans text-3xl font-bold text-ivory">Frequently Asked Questions</h1>
       </div>
 
       <div className="space-y-3">
@@ -44,7 +44,7 @@ export default function FaqPage() {
           >
             <button
               onClick={() => setOpenIndex(openIndex === idx ? -1 : idx)}
-              className="w-full p-5 text-left flex items-center justify-between font-serif font-bold text-base text-ivory hover:text-gold"
+              className="w-full p-5 text-left flex items-center justify-between font-sans font-bold text-base text-ivory hover:text-gold"
             >
               <span>{faq.q}</span>
               <ChevronDown className={`w-5 h-5 text-gold transition-transform duration-300 ${openIndex === idx ? 'rotate-180' : ''}`} />

@@ -80,7 +80,7 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div className="max-w-md mx-auto py-24 text-center space-y-4">
-        <h2 className="font-cinzel text-2xl font-bold text-ivory">Fragrance Not Found</h2>
+        <h2 className="font-sans text-2xl font-bold text-ivory">Fragrance Not Found</h2>
         <Link to="/shop" className="btn-gold inline-block px-6 py-2.5 text-xs uppercase font-bold">Return to Treasury</Link>
       </div>
     );
@@ -142,8 +142,8 @@ export default function ProductDetail() {
               </span>
             </div>
 
-            <h1 className="font-cinzel text-3xl sm:text-4xl font-bold text-ivory mt-1">{product.title}</h1>
-            <p className="text-sm text-muted font-serif italic mt-1">{product.subtitle}</p>
+            <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory mt-1">{product.title}</h1>
+            <p className="text-sm text-muted font-sans italic mt-1">{product.subtitle}</p>
 
             {/* Rating Stars */}
             <div className="flex items-center gap-3 mt-3">
@@ -256,7 +256,7 @@ export default function ProductDetail() {
 
       {/* Tabs: Olfactory Pyramid / Artisanal Craft / Reviews */}
       <div className="space-y-8 border-t border-gold/15 pt-12">
-        <div className="flex flex-wrap border-b border-gold/20 gap-4 sm:gap-8 text-xs sm:text-sm font-cinzel tracking-wider uppercase font-semibold">
+        <div className="flex flex-wrap border-b border-gold/20 gap-4 sm:gap-8 text-xs sm:text-sm font-sans tracking-wider uppercase font-semibold">
           <button
             onClick={() => setActiveTab('notes')}
             className={`pb-3 border-b-2 transition-all ${
@@ -280,7 +280,7 @@ export default function ProductDetail() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-2">
               <span className="text-xs uppercase text-gold font-bold tracking-wider block">Top Notes (Opening)</span>
-              <h4 className="font-serif text-lg font-bold text-ivory">{product.top_notes}</h4>
+              <h4 className="font-sans text-lg font-bold text-ivory">{product.top_notes}</h4>
               <p className="text-xs text-muted font-light leading-relaxed">
                 The immediate sparkle that greets your senses upon application.
               </p>
@@ -288,7 +288,7 @@ export default function ProductDetail() {
 
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-2">
               <span className="text-xs uppercase text-gold font-bold tracking-wider block">Heart Notes (Core)</span>
-              <h4 className="font-serif text-lg font-bold text-ivory">{product.heart_notes}</h4>
+              <h4 className="font-sans text-lg font-bold text-ivory">{product.heart_notes}</h4>
               <p className="text-xs text-muted font-light leading-relaxed">
                 The rich floral & agarwood heart that develops over 2-4 hours.
               </p>
@@ -296,7 +296,7 @@ export default function ProductDetail() {
 
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-2">
               <span className="text-xs uppercase text-gold font-bold tracking-wider block">Base Notes (Dry Down)</span>
-              <h4 className="font-serif text-lg font-bold text-ivory">{product.base_notes}</h4>
+              <h4 className="font-sans text-lg font-bold text-ivory">{product.base_notes}</h4>
               <p className="text-xs text-muted font-light leading-relaxed">
                 The enduring amber & musk residue that clings for over 16 hours.
               </p>
@@ -309,7 +309,7 @@ export default function ProductDetail() {
           <div className="space-y-8 animate-fadeIn">
             {/* Submit Review */}
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-4">
-              <h3 className="font-cinzel text-lg font-bold text-ivory">Write a Client Review</h3>
+              <h3 className="font-sans text-lg font-bold text-ivory">Write a Client Review</h3>
 
               {reviewSubmitted ? (
                 <div className="p-4 bg-gold/10 border border-gold/30 rounded-lg text-xs text-gold">
@@ -365,7 +365,7 @@ export default function ProductDetail() {
                 <div key={rev.id} className="bg-obsidian border border-gold/15 p-5 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-serif font-bold text-ivory text-sm">{rev.user_name}</span>
+                      <span className="font-sans font-bold text-ivory text-sm">{rev.user_name}</span>
                       <span className="text-[10px] bg-gold/20 text-gold px-2 py-0.5 rounded font-num">VERIFIED</span>
                     </div>
                     <div className="flex text-gold">

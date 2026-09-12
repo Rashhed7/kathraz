@@ -59,7 +59,7 @@ export default function ProductCard({ product, onQuickView }) {
             {product.category_name || product.concentration}
           </div>
           <Link to={`/product/${product.slug}`}>
-            <h3 className="font-serif text-base sm:text-lg font-semibold text-ivory mt-0.5 leading-snug">
+            <h3 className="font-sans text-base sm:text-lg font-semibold text-ivory mt-0.5 leading-snug">
               {product.title}
             </h3>
           </Link>

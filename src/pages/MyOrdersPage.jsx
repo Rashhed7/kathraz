@@ -40,11 +40,11 @@ export default function MyOrdersPage() {
       {/* Profile Header */}
       <div className="bg-card border border-gold/20 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-panel">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-gold/20 border border-gold flex items-center justify-center text-gold font-serif text-xl font-bold">
+          <div className="w-14 h-14 rounded-full bg-gold/20 border border-gold flex items-center justify-center text-gold font-sans text-xl font-bold">
             {user?.name ? user.name[0] : 'K'}
           </div>
           <div>
-            <h1 className="font-cinzel text-2xl font-bold text-ivory">{user?.name}</h1>
+            <h1 className="font-sans text-2xl font-bold text-ivory">{user?.name}</h1>
             <p className="text-xs text-muted font-num">{user?.email}</p>
           </div>
         </div>
@@ -54,7 +54,7 @@ export default function MyOrdersPage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="font-cinzel text-xl font-bold text-ivory flex items-center gap-2">
+        <h2 className="font-sans text-xl font-bold text-ivory flex items-center gap-2">
           <Package className="w-5 h-5 text-gold" /> Order Vault & History ({orders.length})
         </h2>
 
@@ -91,7 +91,7 @@ export default function MyOrdersPage() {
                   {ord.items && ord.items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs p-2.5 rounded bg-obsidian border border-gold/10">
                       <div>
-                        <span className="font-bold text-ivory font-serif">{item.product_title}</span>
+                        <span className="font-bold text-ivory font-sans">{item.product_title}</span>
                         <span className="text-gold block text-[10px]">{item.size_label} x {item.quantity}</span>
                       </div>
                       <span className="font-num font-bold text-gold">{formatPrice(item.total)}</span>

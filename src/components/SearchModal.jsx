@@ -53,7 +53,7 @@ export default function SearchModal({ isOpen, onClose }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by note (e.g. Oud, Saffron, Rose), category or title..."
             autoFocus
-            className="w-full bg-transparent text-lg text-ivory placeholder-muted focus:outline-none font-serif tracking-wide"
+            className="w-full bg-transparent text-lg text-ivory placeholder-muted focus:outline-none font-sans tracking-wide"
           />
         </div>
 
@@ -96,7 +96,7 @@ export default function SearchModal({ isOpen, onClose }) {
                 className="w-14 h-14 object-cover rounded-lg border border-gold/20"
               />
               <div className="flex-1">
-                <h4 className="font-serif font-bold text-base text-ivory group-hover:text-gold transition-colors">
+                <h4 className="font-sans font-bold text-base text-ivory group-hover:text-gold transition-colors">
                   {product.title}
                 </h4>
                 <p className="text-xs text-muted truncate max-w-sm font-light">{product.subtitle}</p>

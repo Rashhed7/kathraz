@@ -20,7 +20,7 @@ module.exports = {
         bronze: '#8A6D45',
       },
       fontFamily: {
-        serif: ['Cormorant Garamond', 'Georgia', 'serif'],
+        // Cinzel is reserved for the KATHRAZ wordmark; everything else is Plus Jakarta Sans
         cinzel: ['Cinzel', 'Georgia', 'serif'],
         sans: ['Plus Jakarta Sans', 'sans-serif'],
       }
