@@ -57,7 +57,7 @@ export default function Navbar({ onOpenSearch }) {
           <img
             src="/images/logo.png"
             alt="KATHRAZ"
-            className="h-8 sm:h-10 w-auto object-contain hidden min-[420px]:block"
+            className="h-7 min-[420px]:h-8 sm:h-10 w-auto object-contain"
           />
           <div className="flex flex-col leading-none min-w-0">
             <span className="font-cinzel text-lg sm:text-2xl font-semibold tracking-[0.15em] sm:tracking-[0.3em] text-ivory whitespace-nowrap">

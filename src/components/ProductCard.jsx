@@ -53,23 +53,23 @@ export default function ProductCard({ product, onQuickView }) {
       </div>
 
       {/* Details */}
-      <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+      <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-2 sm:space-y-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.15em] text-muted">
+          <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.15em] text-muted">
             {product.category_name || product.concentration}
           </div>
           <Link to={`/product/${product.slug}`}>
-            <h3 className="font-serif text-lg font-semibold text-ivory mt-0.5 leading-snug">
+            <h3 className="font-serif text-base sm:text-lg font-semibold text-ivory mt-0.5 leading-snug">
               {product.title}
             </h3>
           </Link>
-          <p className="text-xs text-muted font-light line-clamp-1 mt-1">
+          <p className="text-xs text-muted font-light line-clamp-1 mt-1 hidden sm:block">
             {product.subtitle}
           </p>
         </div>
 
         {/* Rating — small, single line */}
-        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-muted">
           <Star className="w-3 h-3 text-gold fill-gold" />
           <span className="text-ivory/70">{product.avg_rating || '5.0'}</span>
           {product.review_count ? <span>({product.review_count})</span> : null}
@@ -77,12 +77,12 @@ export default function ProductCard({ product, onQuickView }) {
 
         {/* Price & Add */}
         <div className="pt-3 border-t border-ivory/10 flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="text-base font-medium text-ivory">
+          <div className="flex items-baseline gap-1.5 sm:gap-2">
+            <span className="text-sm sm:text-base font-medium text-ivory">
               {formatPrice(product.sale_price || product.base_price)}
             </span>
             {product.sale_price && (
-              <span className="text-xs text-muted line-through">
+              <span className="text-[10px] sm:text-xs text-muted line-through">
                 {formatPrice(product.base_price)}
               </span>
             )}
@@ -90,7 +90,7 @@ export default function ProductCard({ product, onQuickView }) {
 
           <button
             onClick={() => addToCart(product, defaultVariant, 1)}
-            className="text-xs text-muted hover:text-ivory border border-ivory/15 hover:border-ivory/40 rounded px-3 py-1.5 transition-colors flex items-center gap-1.5"
+            className="text-[11px] sm:text-xs text-muted hover:text-ivory border border-ivory/15 hover:border-ivory/40 rounded px-2 sm:px-3 py-1.5 transition-colors flex items-center gap-1 sm:gap-1.5 shrink-0"
             title="Add to Bag"
           >
             <ShoppingBag className="w-3.5 h-3.5" /> Add
