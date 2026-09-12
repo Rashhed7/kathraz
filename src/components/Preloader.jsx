@@ -28,27 +28,29 @@ export default function Preloader() {
         phase === 'fade' ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
+      {/* Soft amber glow breathing behind the logo */}
+      <div className="pl-glow absolute rounded-full bg-gold/25 blur-3xl" />
+
       {/* Brand logo */}
       <img
         src="/images/logo.png"
         alt=""
-        className="pl-logo h-20 w-auto object-contain"
+        className="pl-logo relative h-20 w-auto object-contain"
       />
 
-      {/* Hairline */}
-      <div className="pl-hairline h-px w-40 bg-gold/60 my-7" />
-
       {/* Wordmark — Cinzel, letter-spacing eases in, shimmer sweep */}
-      <p className="pl-wordmark font-cinzel text-xl font-semibold tracking-[0.45em] pl-[0.45em]">
+      <p className="pl-wordmark font-cinzel text-xl font-semibold tracking-[0.45em] pl-[0.45em] mt-7">
         KATHRAZ
       </p>
       <p className="pl-sub text-[10px] tracking-[0.4em] pl-[0.4em] text-muted uppercase mt-2">
         Fragrances
       </p>
 
-      {/* Progress line */}
-      <div className="mt-8 h-px w-48 bg-ivory/10 overflow-hidden">
-        <div className="pl-progress h-full w-full bg-gold origin-left" />
+      {/* Three pulsing dots */}
+      <div className="pl-dots mt-8 flex items-center gap-2">
+        <span className="pl-dot h-1.5 w-1.5 rounded-full bg-gold" style={{ animationDelay: '0s' }} />
+        <span className="pl-dot h-1.5 w-1.5 rounded-full bg-gold" style={{ animationDelay: '0.25s' }} />
+        <span className="pl-dot h-1.5 w-1.5 rounded-full bg-gold" style={{ animationDelay: '0.5s' }} />
       </div>
     </div>
   );

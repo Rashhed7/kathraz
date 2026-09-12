@@ -50,18 +50,12 @@ export default function Home({ onOpenSearch }) {
           absolutes and a 35% extrait concentration — made in small batches
           and delivered across India.
         </p>
-        <div className="mt-9 flex flex-col sm:flex-row justify-center gap-3">
+        <div className="mt-9 flex justify-center">
           <Link
             to="/shop"
             className="btn-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
           >
             Shop the Collection
-          </Link>
-          <Link
-            to="/about"
-            className="btn-outline-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
-          >
-            How We Make It
           </Link>
         </div>
         <p className="mt-8 text-xs text-muted">

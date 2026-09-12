@@ -223,6 +223,19 @@ async function initDatabase() {
     )
   `);
 
+  // Contact Inquiries Table (customer messages from the Contact page)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS inquiries (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      subject TEXT,
+      message TEXT NOT NULL,
+      status TEXT DEFAULT 'new',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   await seedInitialData();
 }
 

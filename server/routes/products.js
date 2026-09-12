@@ -39,8 +39,9 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
-      sql += ` AND (p.title LIKE ? OR p.description LIKE ? OR p.top_notes LIKE ? OR p.heart_notes LIKE ? OR p.base_notes LIKE ?)`;
-      const term = `%${search}%`;
+      // ILIKE = case-insensitive, so "oud" finds "Oud Royal"
+      sql += ` AND (p.title ILIKE ? OR p.description ILIKE ? OR p.top_notes ILIKE ? OR p.heart_notes ILIKE ? OR p.base_notes ILIKE ?)`;
+      const term = `%${search.trim()}%`;
       params.push(term, term, term, term, term);
     }
 
@@ -50,8 +51,8 @@ router.get('/', async (req, res) => {
     }
 
     if (concentration) {
-      sql += ` AND p.concentration LIKE ?`;
-      params.push(`%${concentration}%`);
+      sql += ` AND p.concentration ILIKE ?`;
+      params.push(`%${concentration.trim()}%`);
     }
 
     if (minPrice) {

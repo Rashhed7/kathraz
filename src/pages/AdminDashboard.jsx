@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer
+  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -55,6 +55,10 @@ export default function AdminDashboard() {
 
   // Coupons State
   const [coupons, setCoupons] = useState([]);
+
+  // Inquiries State (customer messages from Contact page)
+  const [inquiries, setInquiries] = useState([]);
+  const newInquiriesCount = inquiries.filter((i) => i.status === 'new').length;
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponType, setNewCouponType] = useState('percentage');
   const [newCouponValue, setNewCouponValue] = useState(15);
@@ -114,6 +118,15 @@ export default function AdminDashboard() {
       if (resCoupons.ok) {
         const data = await resCoupons.json();
         setCoupons(data.coupons || []);
+      }
+
+      // 6. Fetch Contact Inquiries
+      const resInquiries = await fetch('/api/inquiries', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resInquiries.ok) {
+        const data = await resInquiries.json();
+        setInquiries(data.inquiries || []);
       }
     } catch (e) {
       console.error(e);
@@ -218,6 +231,33 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Mark inquiry as read
+  const handleMarkInquiryRead = async (id) => {
+    try {
+      await fetch(`/api/inquiries/${id}/read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Delete inquiry
+  const handleDeleteInquiry = async (id) => {
+    if (!window.confirm('Delete this inquiry?')) return;
+    try {
+      await fetch(`/api/inquiries/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadDashboardData();
     } catch (e) {
       console.error(e);
     }
@@ -334,6 +374,7 @@ export default function AdminDashboard() {
           { id: 'products', label: `Products (${products.length})`, icon: Package },
           { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingBag },
           { id: 'customers', label: `Customers (${customers.length})`, icon: Users },
+          { id: 'inquiries', label: `Inquiries${newInquiriesCount > 0 ? ` (${newInquiriesCount})` : ''}`, icon: Inbox },
           { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -654,6 +695,74 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: INQUIRIES */}
+      {activeTab === 'inquiries' && (
+        <div className="space-y-6 animate-fadeIn">
+          <h2 className="font-sans text-xl font-bold text-ivory">Customer Inquiries</h2>
+          {inquiries.length === 0 ? (
+            <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+              No inquiries yet. Messages sent from the Contact page will appear here.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {inquiries.map((inq) => (
+                <div
+                  key={inq.id}
+                  className={`bg-card border rounded-2xl p-5 space-y-3 ${
+                    inq.status === 'new' ? 'border-gold/60' : 'border-gold/15'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <strong className="text-ivory text-sm">{inq.name}</strong>
+                      <a href={`mailto:${inq.email}`} className="font-num text-xs text-gold hover:underline">
+                        {inq.email}
+                      </a>
+                      {inq.status === 'new' && (
+                        <span className="text-[10px] bg-gold text-charcoal px-2 py-0.5 rounded-full font-bold uppercase">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted font-num">
+                      {new Date(inq.created_at).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {inq.subject && (
+                    <p className="text-[11px] text-gold uppercase tracking-wider">{inq.subject}</p>
+                  )}
+                  <p className="text-xs text-ivory/80 whitespace-pre-wrap leading-relaxed">{inq.message}</p>
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gold/10">
+                    <a
+                      href={`mailto:${inq.email}?subject=${encodeURIComponent('Re: ' + (inq.subject || 'Your KATHRAZ inquiry'))}`}
+                      className="btn-gold px-4 py-2 rounded text-[11px] font-bold uppercase flex items-center gap-1.5"
+                    >
+                      <Mail className="w-3.5 h-3.5" /> Reply by Email
+                    </a>
+                    {inq.status === 'new' && (
+                      <button
+                        onClick={() => handleMarkInquiryRead(inq.id)}
+                        className="btn-outline-gold px-4 py-2 rounded text-[11px] font-bold uppercase"
+                      >
+                        Mark as Read
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteInquiry(inq.id)}
+                      className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-400 text-red-700 rounded text-[11px] font-bold"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -121,9 +121,9 @@ h1, h2, h3, h4 {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
-@keyframes plHairline {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+@keyframes plGlow {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 0.75; transform: scale(1.1); }
 }
 @keyframes plWordmark {
   from { opacity: 0; letter-spacing: 0.8em; }
@@ -137,18 +137,20 @@ h1, h2, h3, h4 {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes plProgress {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+@keyframes plDot {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
 }
 
 .pl-logo {
   opacity: 0;
   animation: plLogo 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
 }
-.pl-hairline {
-  transform: scaleX(0);
-  animation: plHairline 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.8s forwards;
+.pl-glow {
+  width: 260px;
+  height: 260px;
+  opacity: 0;
+  animation: plGlow 2.6s ease-in-out 0.4s infinite;
 }
 .pl-wordmark {
   opacity: 0;
@@ -167,16 +169,16 @@ h1, h2, h3, h4 {
   opacity: 0;
   animation: plSub 0.8s ease-out 1.6s forwards;
 }
-.pl-progress {
-  transform: scaleX(0);
-  animation: plProgress 2s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
+.pl-dot {
+  opacity: 0;
+  animation: plDot 1.2s ease-in-out 1.8s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pl-logo, .pl-sub { opacity: 1; animation: none; }
-  .pl-hairline { transform: none; animation: none; }
+  .pl-glow { opacity: 0.4; animation: none; }
   .pl-wordmark { opacity: 1; background: none; -webkit-text-fill-color: currentColor; animation: none; }
-  .pl-progress { animation-duration: 0.4s; }
+  .pl-dot { opacity: 0.6; animation: none; }
 }
 
 /* ---- Print / PDF (invoices) ---- */
@@ -255,8 +257,44 @@ h1, h2, h3, h4 {
   animation-play-state: paused;
 }
 
+/* Logo separators between ticker items — gentle staggered pulse */
+@keyframes sepPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-sepPulse {
+  animation: sepPulse 3.2s ease-in-out infinite;
+}
+
+/* Soft light sweep across the announcement bar — second moving layer */
+.sheen {
+  position: relative;
+}
+
+.sheen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 120px;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: sheenSweep 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sheenSweep {
+  0% { transform: translateX(-140px); }
+  55%, 100% { transform: translateX(100vw); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee {
+    animation: none;
+  }
+  .animate-sepPulse,
+  .sheen::after {
     animation: none;
   }
 }

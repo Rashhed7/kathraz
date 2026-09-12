@@ -155,10 +155,22 @@ router.get('/my-orders', authenticateToken, async (req, res) => {
 });
 
 // Track Order Publicly
+// Forgiving matching: case-insensitive, and ignores spaces/dashes so
+// "ktz 89210", "KTZ-89210" and "ktz89210" all find the same order.
 router.get('/track/:query', async (req, res) => {
   try {
-    const { query } = req.params;
-    const order = await getQuery('SELECT * FROM orders WHERE order_number = ? OR tracking_number = ? OR customer_email = ? ORDER BY id DESC', [query, query, query]);
+    const raw = String(req.params.query || '').trim().toLowerCase();
+    const stripped = raw.replace(/[\s-]/g, '');
+    const order = await getQuery(
+      `SELECT * FROM orders
+       WHERE LOWER(order_number) = ?
+          OR REPLACE(REPLACE(LOWER(order_number), '-', ''), ' ', '') = ?
+          OR LOWER(tracking_number) = ?
+          OR REPLACE(REPLACE(LOWER(tracking_number), '-', ''), ' ', '') = ?
+          OR LOWER(customer_email) = ?
+       ORDER BY id DESC`,
+      [raw, stripped, raw, stripped, raw]
+    );
 
     if (!order) {
       return res.status(404).json({ error: 'No order found with the provided details' });

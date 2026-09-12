@@ -12,10 +12,33 @@ function WhatsAppIcon({ className }) {
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setFormError('');
+    setSending(true);
+    try {
+      const fd = new FormData(e.target);
+      const res = await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fd.get('name'),
+          email: fd.get('email'),
+          subject: fd.get('subject'),
+          message: fd.get('message'),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+      setSubmitted(true);
+    } catch (err) {
+      setFormError(err.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -50,6 +73,7 @@ export default function ContactPage() {
                   <label className="text-muted block mb-1">Your Name</label>
                   <input
                     type="text"
+                    name="name"
                     required
                     placeholder="Full name"
                     className="w-full bg-obsidian border border-ivory/15 text-ivory p-3 focus:outline-none focus:border-ivory/40"
@@ -59,6 +83,7 @@ export default function ContactPage() {
                   <label className="text-muted block mb-1">Email Address</label>
                   <input
                     type="email"
+                    name="email"
                     required
                     placeholder="you@example.com"
                     className="w-full bg-obsidian border border-ivory/15 text-ivory p-3 focus:outline-none focus:border-ivory/40"
@@ -68,7 +93,7 @@ export default function ContactPage() {
 
               <div>
                 <label className="text-muted block mb-1">Subject</label>
-                <select className="w-full bg-obsidian border border-ivory/15 text-ivory p-3 focus:outline-none focus:border-ivory/40">
+                <select name="subject" className="w-full bg-obsidian border border-ivory/15 text-ivory p-3 focus:outline-none focus:border-ivory/40">
                   <option>Order status or support</option>
                   <option>Choosing a fragrance</option>
                   <option>Wholesale & bulk orders</option>
@@ -79,6 +104,7 @@ export default function ContactPage() {
               <div>
                 <label className="text-muted block mb-1">Message</label>
                 <textarea
+                  name="message"
                   required
                   rows="4"
                   placeholder="How can we help?"
@@ -86,8 +112,16 @@ export default function ContactPage() {
                 />
               </div>
 
-              <button type="submit" className="w-full btn-gold py-3.5 uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2">
-                Send Message <Send className="w-4 h-4" />
+              {formError && (
+                <p className="text-[11px] text-red-600">{formError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full btn-gold py-3.5 uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {sending ? 'Sending…' : 'Send Message'} {!sending && <Send className="w-4 h-4" />}
               </button>
             </form>
           )}

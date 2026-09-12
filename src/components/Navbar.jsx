@@ -24,15 +24,21 @@ export default function Navbar({ onOpenSearch }) {
 
   return (
     <header className="sticky top-0 z-40 bg-obsidian/95 backdrop-blur-sm border-b border-ivory/10">
-      {/* Announcement Bar — scrolling greetings & offers, pauses on hover */}
-      <div className="marquee-hover overflow-hidden bg-charcoal text-muted text-[11px] py-2 tracking-[0.15em] uppercase border-b border-ivory/5">
+      {/* Announcement Bar — scrolling greetings & offers, pauses on hover.
+          Black text to match the black logo separators. */}
+      <div className="marquee-hover sheen overflow-hidden bg-charcoal text-ivory text-[11px] py-2 tracking-[0.15em] uppercase border-b border-ivory/5">
         <div className="animate-marquee flex w-max items-center">
           {[0, 1].map((copy) => (
             <div key={copy} className="flex items-center" aria-hidden={copy === 1}>
               {ANNOUNCEMENTS.map((item, idx) => (
                 <span key={idx} className="flex items-center whitespace-nowrap">
                   <span className="px-6">{item}</span>
-                  <span className="text-gold/60">◆</span>
+                  <img
+                    src="/images/logo.png"
+                    alt=""
+                    className="h-4 w-auto object-contain animate-sepPulse"
+                    style={{ animationDelay: `${(idx % 5) * 0.4}s` }}
+                  />
                 </span>
               ))}
             </div>
@@ -74,7 +80,6 @@ export default function Navbar({ onOpenSearch }) {
           <Link to="/" className="hover:text-ivory transition-colors py-2">Home</Link>
           <Link to="/shop" className="hover:text-ivory transition-colors py-2">Shop All</Link>
           <Link to="/shop?category=personal-fragrances" className="hover:text-ivory transition-colors py-2">Extrait de Parfum</Link>
-          <Link to="/about" className="hover:text-ivory transition-colors py-2">Our Story</Link>
           <Link to="/contact" className="hover:text-ivory transition-colors py-2">Contact</Link>
           {isAdmin && (
             <Link to="/admin" className="flex items-center gap-1.5 text-muted hover:text-ivory transition-colors py-2">
@@ -221,7 +226,6 @@ export default function Navbar({ onOpenSearch }) {
           <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Home</Link>
           <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Shop All</Link>
           <Link to="/shop?category=personal-fragrances" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Extrait de Parfum</Link>
-          <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Our Story</Link>
           <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">FAQ & Support</Link>
           <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Track an Order</Link>
           <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">

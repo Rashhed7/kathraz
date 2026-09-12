@@ -57,7 +57,6 @@ export default function Footer() {
               <li><Link to="/track-order" className="hover:text-ivory transition-colors">Track an Order</Link></li>
               <li><Link to="/faq" className="hover:text-ivory transition-colors">FAQ & Shipping</Link></li>
               <li><Link to="/contact" className="hover:text-ivory transition-colors">Contact</Link></li>
-              <li><Link to="/about" className="hover:text-ivory transition-colors">Our Story</Link></li>
             </ul>
           </div>
 

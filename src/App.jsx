@@ -22,7 +22,6 @@ import InvoicePage from './pages/InvoicePage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -53,7 +52,6 @@ export default function App() {
                   <Route path="/my-orders" element={<MyOrdersPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/about" element={<AboutPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/faq" element={<FaqPage />} />
                   <Route path="/admin" element={<AdminDashboard />} />
