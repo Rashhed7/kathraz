@@ -1,0 +1,25 @@
+# Render Blueprint — deploys the KATHRAZ store (Express + built React frontend in one service)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: kathraz
+    runtime: node
+    plan: free
+    region: singapore # closest region to India
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # Paste your Supabase session-pooler connection string (from your local .env)
+      - key: DATABASE_URL
+        sync: false
+      # Supabase Storage (product image uploads)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Auto-generated random secret on first deploy
+      - key: JWT_SECRET
+        generateValue: true
