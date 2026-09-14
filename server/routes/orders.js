@@ -1,10 +1,38 @@
 const express = require('express');
+const crypto = require('crypto');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Create Order (Razorpay ready)
+// Lazily-initialized Razorpay client (keys come from .env)
+let razorpayClient = null;
+function getRazorpayClient() {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    throw new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env');
+  }
+  if (!razorpayClient) {
+    const Razorpay = require('razorpay');
+    razorpayClient = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  }
+  return razorpayClient;
+}
+
+// Verify the HMAC-SHA256 signature Razorpay returns after checkout
+function verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, signature) {
+  const expected = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signature || '')
+  );
+}
+
+// Create Order (Razorpay)
 router.post('/', async (req, res) => {
   try {
     const { customer_name, customer_email, phone, shipping_address, cart_items, coupon_code, payment_method, gift_message } = req.body;
@@ -77,8 +105,29 @@ router.post('/', async (req, res) => {
     // Generate Order Number KTZ-XXXXX
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const orderNumber = `KTZ-${randomSuffix}`;
-    const initialStatus = 'Confirmed';
-    const paymentStatus = payment_method === 'COD' ? 'Pending' : 'Paid';
+
+    const isRazorpay = (payment_method || 'Razorpay') !== 'COD';
+
+    // Create the REAL Razorpay order BEFORE writing anything to our DB,
+    // so a gateway failure never leaves a half-created order behind.
+    let razorpayOrder = null;
+    if (isRazorpay) {
+      try {
+        razorpayOrder = await getRazorpayClient().orders.create({
+          amount: Math.round(totalAmount * 100), // paise
+          currency: 'INR',
+          receipt: orderNumber,
+          notes: { customer_email, customer_name }
+        });
+      } catch (rzpError) {
+        console.error('Razorpay order creation failed:', rzpError.error || rzpError);
+        const msg = rzpError?.error?.description || 'Payment gateway is unavailable. Please try again.';
+        return res.status(502).json({ error: msg });
+      }
+    }
+
+    const initialStatus = isRazorpay ? 'Pending' : 'Confirmed';
+    const paymentStatus = 'Pending'; // becomes 'Paid' only after verified payment (or COD delivery)
 
     const orderRes = await runQuery(`
       INSERT INTO orders (order_number, user_id, customer_name, customer_email, shipping_address, phone, payment_method, payment_status, order_status, subtotal, discount_amount, shipping_fee, total_amount, tracking_number, gift_message)
@@ -114,12 +163,13 @@ router.post('/', async (req, res) => {
       await runQuery('UPDATE variants SET stock_quantity = stock_quantity - ? WHERE id = ?', [item.quantity, item.variant_id]);
     }
 
-    // Insert Razorpay payment record mock/live entry
-    const razorpayOrderId = `rzp_order_${Math.random().toString(36).substring(2, 12)}`;
-    await runQuery(`
-      INSERT INTO payments (order_id, razorpay_order_id, razorpay_payment_id, payment_status, amount)
-      VALUES (?, ?, ?, ?, ?)
-    `, [orderId, razorpayOrderId, `pay_${Math.random().toString(36).substring(2, 12)}`, paymentStatus === 'Paid' ? 'SUCCESS' : 'PENDING', totalAmount]);
+    // Record the pending payment with the real Razorpay order id
+    if (razorpayOrder) {
+      await runQuery(`
+        INSERT INTO payments (order_id, razorpay_order_id, razorpay_payment_id, payment_status, amount)
+        VALUES (?, ?, ?, ?, ?)
+      `, [orderId, razorpayOrder.id, null, 'PENDING', totalAmount]);
+    }
 
     const createdOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [orderId]);
     const orderItems = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
@@ -128,16 +178,68 @@ router.post('/', async (req, res) => {
       message: 'Order created successfully',
       order: createdOrder,
       items: orderItems,
-      razorpay: {
-        order_id: razorpayOrderId,
-        amount: totalAmount * 100, // paise
-        currency: 'INR',
-        key: process.env.RAZORPAY_KEY_ID || 'rzp_test_KATHRAZ_LUXURY_KEY'
-      }
+      razorpay: razorpayOrder
+        ? {
+            order_id: razorpayOrder.id,
+            amount: razorpayOrder.amount,
+            currency: razorpayOrder.currency,
+            key: process.env.RAZORPAY_KEY_ID
+          }
+        : null
     });
   } catch (error) {
     console.error('Order creation error:', error);
     res.status(500).json({ error: 'Failed to process order' });
+  }
+});
+
+// Verify Razorpay payment after checkout completes (called by the frontend handler)
+router.post('/verify', async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ verified: false, error: 'Missing payment details' });
+    }
+
+    let valid = false;
+    try {
+      valid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    } catch (e) {
+      valid = false;
+    }
+
+    if (!valid) {
+      console.error('Razorpay signature verification failed for payment:', razorpay_payment_id);
+      return res.status(400).json({ verified: false, error: 'Payment verification failed' });
+    }
+
+    // Find the order linked to this Razorpay order
+    const payment = await getQuery('SELECT * FROM payments WHERE razorpay_order_id = ?', [razorpay_order_id]);
+    if (!payment) {
+      return res.status(404).json({ verified: false, error: 'Payment record not found' });
+    }
+
+    // Mark payment SUCCESS and order Paid/Confirmed
+    await runQuery(
+      'UPDATE payments SET razorpay_payment_id = ?, razorpay_signature = ?, payment_status = ? WHERE id = ?',
+      [razorpay_payment_id, razorpay_signature, 'SUCCESS', payment.id]
+    );
+
+    await runQuery(
+      `UPDATE orders SET payment_status = 'Paid', order_status = 'Confirmed' WHERE id = ?`,
+      [payment.order_id]
+    );
+
+    const updatedOrder = await getQuery('SELECT order_number FROM orders WHERE id = ?', [payment.order_id]);
+
+    res.json({
+      verified: true,
+      order_number: updatedOrder?.order_number || null
+    });
+  } catch (error) {
+    console.error('Payment verification error:', error);
+    res.status(500).json({ verified: false, error: 'Failed to verify payment' });
   }
 });
 

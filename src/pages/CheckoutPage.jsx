@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, CreditCard, Lock, MapPin, User, Phone, Mail, ArrowRight, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import RazorpayModal from '../components/RazorpayModal';
 
 export default function CheckoutPage() {
   const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupon, setAppliedCoupon, giftMessage, clearCart } = useCart();
@@ -18,8 +17,6 @@ export default function CheckoutPage() {
 
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState('');
-  const [createdOrderPayload, setCreatedOrderPayload] = useState(null);
-  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -122,10 +119,15 @@ export default function CheckoutPage() {
         throw new Error(data.error || 'Failed to place order');
       }
 
-      setCreatedOrderPayload(data);
-
       if (paymentMethod === 'Razorpay') {
-        setShowRazorpayModal(true);
+        // Open the real Razorpay Checkout window and wait for the result.
+        const paid = await openRazorpayCheckout(data);
+        if (paid) {
+          clearCart();
+          navigate(`/order-confirmation?orderNumber=${data.order.order_number}`);
+        }
+        // If dismissed, keep the order pending — user can retry payment
+        // from checkout (re-submitting creates a fresh Razorpay order).
       } else {
         // COD Direct Success
         clearCart();
@@ -138,11 +140,70 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleRazorpaySuccess = (razorpayData) => {
-    setShowRazorpayModal(false);
-    clearCart();
-    navigate(`/order-confirmation?orderNumber=${createdOrderPayload.order.order_number}`);
-  };
+  // Opens Razorpay Checkout and verifies the payment signature server-side.
+  // Resolves true on verified success, false if dismissed or verification failed.
+  const openRazorpayCheckout = (orderData) =>
+    new Promise((resolve) => {
+      const rzp = orderData.razorpay;
+      if (!rzp || !rzp.key || !rzp.order_id) {
+        setError('Payment gateway is not configured. Please contact support.');
+        resolve(false);
+        return;
+      }
+      if (typeof window.Razorpay === 'undefined') {
+        setError('Payment gateway failed to load. Check your connection and retry.');
+        resolve(false);
+        return;
+      }
+
+      const options = {
+        key: rzp.key,
+        amount: rzp.amount,
+        currency: rzp.currency || 'INR',
+        name: 'KATHRAZ Fragrances',
+        description: `Order ${orderData.order.order_number}`,
+        order_id: rzp.order_id,
+        prefill: {
+          name: customerName,
+          email: customerEmail,
+          contact: phone
+        },
+        theme: { color: '#9C7A3C' },
+        handler: async (response) => {
+          try {
+            const verifyRes = await fetch('/api/orders/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok && verifyData.verified) {
+              resolve(true);
+            } else {
+              setError(verifyData.error || 'Payment verification failed. Contact support with your payment ID.');
+              resolve(false);
+            }
+          } catch (err) {
+            setError('Could not verify payment. Please contact support.');
+            resolve(false);
+          }
+        },
+        modal: {
+          ondismiss: () => resolve(false)
+        }
+      };
+
+      const rzpInstance = new window.Razorpay(options);
+      rzpInstance.on('payment.failed', () => {
+        setError('Payment failed at the bank/gateway. You can retry with a different method.');
+        resolve(false);
+      });
+      rzpInstance.open();
+    });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
@@ -337,16 +398,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       </form>
-
-      {/* Razorpay Interactive Modal */}
-      {showRazorpayModal && createdOrderPayload && (
-        <RazorpayModal
-          isOpen={showRazorpayModal}
-          orderDetails={createdOrderPayload}
-          onSuccess={handleRazorpaySuccess}
-          onClose={() => setShowRazorpayModal(false)}
-        />
-      )}
     </div>
   );
 }
