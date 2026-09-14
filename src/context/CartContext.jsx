@@ -78,6 +78,11 @@ export const CartProvider = ({ children }) => {
     setGiftMessage('');
   };
 
+  // Replace the entire cart contents (used by checkout cart validation)
+  const replaceCart = (items) => {
+    setCart(Array.isArray(items) ? items : []);
+  };
+
   const subtotalINR = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   let discountINR = 0;
@@ -114,6 +119,7 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         updateQuantity,
         clearCart,
+        replaceCart,
         currency,
         setCurrency,
         appliedCoupon,

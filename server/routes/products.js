@@ -166,6 +166,69 @@ router.get('/:identifier', async (req, res) => {
   }
 });
 
+// Validate Cart Items
+// The cart lives in localStorage and can go stale (variant deleted, price
+// changed, stock reduced). Checkout calls this on mount so the order request
+// only ever contains variants that actually exist, at the current price.
+router.post('/validate-cart', async (req, res) => {
+  try {
+    const { cart_items } = req.body;
+
+    if (!Array.isArray(cart_items)) {
+      return res.status(400).json({ error: 'cart_items must be an array' });
+    }
+
+    const validItems = [];
+    const removedItems = [];
+    const adjustments = [];
+
+    for (let item of cart_items) {
+      const variant = await getQuery(
+        `SELECT v.id, v.size_label, v.price, v.stock_quantity, p.id as product_id, p.title, p.image_url
+         FROM variants v
+         JOIN products p ON v.product_id = p.id
+         WHERE v.id = ?`,
+        [item.variant_id]
+      );
+
+      if (!variant) {
+        removedItems.push({ variant_id: item.variant_id, title: item.title || 'Unknown item' });
+        continue;
+      }
+
+      // Clamp quantity to available stock (0 => treat as removed)
+      const maxQty = Math.max(0, Math.min(item.quantity, variant.stock_quantity));
+      if (maxQty === 0) {
+        removedItems.push({ variant_id: item.variant_id, title: variant.title });
+        continue;
+      }
+      if (maxQty < item.quantity) {
+        adjustments.push({ variant_id: item.variant_id, title: variant.title, type: 'stock', from: item.quantity, to: maxQty });
+      }
+
+      if (variant.price !== item.price) {
+        adjustments.push({ variant_id: item.variant_id, title: variant.title, type: 'price', from: item.price, to: variant.price });
+      }
+      
+      validItems.push({
+        product_id: variant.product_id,
+        variant_id: variant.id,
+        title: variant.title,
+        size_label: variant.size_label,
+        price: variant.price,
+        image_url: variant.image_url,
+        quantity: maxQty,
+        max_stock: variant.stock_quantity
+      });
+    }
+    
+    res.json({ valid_items: validItems, removed_items: removedItems, adjustments });
+  } catch (error) {
+    console.error('Cart validation error:', error);
+    res.status(500).json({ error: 'Failed to validate cart' });
+  }
+});
+
 // Post Product Review
 router.post('/:id/reviews', async (req, res) => {
   try {

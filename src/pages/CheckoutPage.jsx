@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
 export default function CheckoutPage() {
-  const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupon, setAppliedCoupon, giftMessage, clearCart } = useCart();
+  const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupon, setAppliedCoupon, giftMessage, clearCart, replaceCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -17,6 +17,7 @@ export default function CheckoutPage() {
 
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState('');
+  const [cartNotice, setCartNotice] = useState(null);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -30,6 +31,53 @@ export default function CheckoutPage() {
       if (!customerEmail) setCustomerEmail(user.email);
     }
   }, [user]);
+
+  // Re-validate the saved cart against the database on mount. The cart lives
+  // in localStorage and can go stale (variant deleted, price changed, stock
+  // reduced) — without this, placing the order fails with "Variant ID N not found".
+  useEffect(() => {
+    let cancelled = false;
+
+    const validateCart = async () => {
+      try {
+        const res = await fetch('/api/products/validate-cart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cart_items: cart })
+        });
+        if (!res.ok) return; // validation is best-effort; order endpoint re-checks anyway
+        const data = await res.json();
+        if (cancelled) return;
+
+        const removed = data.removed_items || [];
+        const adjusted = data.adjustments || [];
+        if (removed.length === 0 && adjusted.length === 0) return;
+
+        // Replace cart contents with the server-validated snapshot
+        replaceCart(data.valid_items || []);
+
+        const notices = [];
+        if (removed.length > 0) {
+          notices.push(`Removed unavailable item${removed.length > 1 ? 's' : ''}: ${removed.map(r => r.title).join(', ')}`);
+        }
+        adjusted.forEach(adj => {
+          if (adj.type === 'stock') {
+            notices.push(`${adj.title}: quantity reduced to ${adj.to} (limited stock)`);
+          } else if (adj.type === 'price') {
+            notices.push(`${adj.title}: price updated`);
+          }
+        });
+        if (notices.length > 0) {
+          setCartNotice(notices.join(' • '));
+        }
+      } catch (err) {
+        // Silent — checkout can proceed and the order endpoint will still verify
+      }
+    };
+
+    if (cart.length > 0) validateCart();
+    return () => { cancelled = true; };
+  }, []);
 
   // Re-validate an already-applied coupon whenever the subtotal changes (e.g. quantity edits)
   useEffect(() => {
@@ -220,6 +268,12 @@ export default function CheckoutPage() {
           <h2 className="font-sans text-lg font-bold text-ivory flex items-center gap-2 border-b border-gold/15 pb-3">
             <MapPin className="w-5 h-5 text-gold" /> Shipping Address & Contact
           </h2>
+
+          {cartNotice && (
+            <div className="p-3 bg-gold/10 border border-gold/40 text-xs text-gold rounded">
+              {cartNotice}
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-400 text-xs text-red-700 rounded">
