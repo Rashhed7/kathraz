@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
@@ -12,6 +12,25 @@ export default function Home({ onOpenSearch }) {
   const [selectedQuickView, setSelectedQuickView] = useState(null);
   const [activeNoteTab, setActiveNoteTab] = useState('top');
   const [loading, setLoading] = useState(true);
+  const heroVideoRef = useRef(null);
+
+  // Mobile autoplay fix: React doesn't reliably render the `muted` attribute,
+  // and iOS Safari only allows autoplay when that attribute is on the DOM node.
+  useEffect(() => {
+    const video = heroVideoRef.current;
+    if (!video) return;
+    video.muted = true;
+    video.play().catch(() => {
+      // Autoplay refused — retry once after the user interacts with the page.
+      const resume = () => {
+        video.play().catch(() => {});
+        window.removeEventListener('touchstart', resume);
+        window.removeEventListener('click', resume);
+      };
+      window.addEventListener('touchstart', resume, { once: true });
+      window.addEventListener('click', resume, { once: true });
+    });
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -41,13 +60,14 @@ export default function Home({ onOpenSearch }) {
         {/* Video layer (hidden until the file exists — graceful gradient fallback) */}
         <div className="absolute inset-0" aria-hidden="true">
           <video
+            ref={heroVideoRef}
             className="w-full h-full object-cover"
             src="/videos/hero-cover.mp4"
             autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="auto"
             onError={(e) => e.currentTarget.classList.add('hidden')}
           />
           {/* Legibility overlays: light wash + top/bottom fade into the page */}
