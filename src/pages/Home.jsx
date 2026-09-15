@@ -36,31 +36,51 @@ export default function Home({ onOpenSearch }) {
   return (
     <div className="pb-24">
 
-      {/* HERO — clean, text-only */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 lg:pt-28 text-center">
-        <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-6">
-          Crafted in India · Est. 2026
-        </p>
-        <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
-          Fine fragrances, thoughtfully made.
-        </h1>
-        <p className="mt-6 text-sm sm:text-[15px] text-ivory/70 font-light leading-relaxed max-w-xl mx-auto">
-          We create inspired interpretations of the world's most celebrated
-          perfumes, alongside original blends built on aged oud, Indian rose
-          absolutes and a 35% extrait concentration — made in small batches
-          and delivered across India.
-        </p>
-        <div className="mt-9 flex justify-center">
-          <Link
-            to="/shop"
-            className="btn-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
-          >
-            Shop the Collection
-          </Link>
+      {/* HERO — cover video background with text overlay */}
+      <section className="relative overflow-hidden">
+        {/* Video layer (hidden until the file exists — graceful gradient fallback) */}
+        <div className="absolute inset-0" aria-hidden="true">
+          <video
+            className="w-full h-full object-cover"
+            src="/videos/hero-cover.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            onError={(e) => e.currentTarget.classList.add('hidden')}
+          />
+          {/* Legibility overlays: light wash + top/bottom fade into the page */}
+          <div className="absolute inset-0 bg-obsidian/70" />
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-obsidian to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-obsidian to-transparent" />
         </div>
-        <p className="mt-8 text-xs text-muted">
-          Ships across India in 2–4 days · Free above ₹5,000
-        </p>
+
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
+          <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-6">
+            Crafted in India · Est. 2026
+          </p>
+          <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
+            Fine fragrances, thoughtfully made.
+          </h1>
+          <p className="mt-6 text-sm sm:text-[15px] text-ivory/80 font-light leading-relaxed max-w-xl mx-auto">
+            We create inspired interpretations of the world's most celebrated
+            perfumes, alongside original blends built on aged oud, Indian rose
+            absolutes and a 35% extrait concentration — made in small batches
+            and delivered across India.
+          </p>
+          <div className="mt-9 flex justify-center">
+            <Link
+              to="/shop"
+              className="btn-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
+            >
+              Shop the Collection
+            </Link>
+          </div>
+          <p className="mt-8 text-xs text-muted">
+            Ships across India in 2–4 days · Free above ₹5,000
+          </p>
+        </div>
       </section>
 
       {/* CATEGORY — single honest band */}
