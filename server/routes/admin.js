@@ -50,7 +50,17 @@ router.post('/products', async (req, res) => {
     const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, gallery, is_featured, is_bestseller, variants } = req.body;
 
     if (!title || !base_price || !category_id) {
-      return res.status(400).json({ error: 'Title, base price, and category are required' });
+      return res.status(400).json({ error: 'Title, original price, and category are required' });
+    }
+
+    const salePrice = sale_price === null || sale_price === '' || sale_price === undefined
+      ? null
+      : Number(sale_price);
+    if (salePrice !== null && (Number.isNaN(salePrice) || salePrice <= 0)) {
+      return res.status(400).json({ error: 'Offer price must be a positive number' });
+    }
+    if (salePrice !== null && salePrice >= Number(base_price)) {
+      return res.status(400).json({ error: 'Offer price must be lower than the original price' });
     }
 
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -65,7 +75,7 @@ router.post('/products', async (req, res) => {
       description || '',
       category_id,
       base_price,
-      sale_price || null,
+      salePrice,
       is_featured ? 1 : 0,
       is_bestseller ? 1 : 0,
       gender || 'Unisex',
@@ -76,7 +86,11 @@ router.post('/products', async (req, res) => {
       longevity || '12+ Hours',
       sillage || 'Intense',
       image_url || '/images/oud_royal.jpg',
-      JSON.stringify(gallery || [image_url || '/images/oud_royal.jpg'])
+      JSON.stringify(
+        Array.isArray(gallery) && gallery.length > 0
+          ? gallery.filter((g) => typeof g === 'string' && g.trim() !== '')
+          : [image_url || '/images/oud_royal.jpg']
+      )
     ]);
 
     const productId = result.lastID;
@@ -90,11 +104,12 @@ router.post('/products', async (req, res) => {
         `, [productId, v.size_label, v.price, v.sku || `KTZ-${productId}-${v.size_label.replace(/\s+/g, '')}`, v.stock_quantity || 50]);
       }
     } else {
-      // Default variant
+      // Default variant — priced at the effective (offer) price so the shop
+      // shows the offer, not the original
       await runQuery(`
         INSERT INTO variants (product_id, size_label, price, sku, stock_quantity)
         VALUES (?, '50ml Standard', ?, ?, 50)
-      `, [productId, base_price, `KTZ-${productId}-50ML`]);
+      `, [productId, salePrice !== null ? salePrice : base_price, `KTZ-${productId}-50ML`]);
     }
 
     const created = await getQuery('SELECT * FROM products WHERE id = ?', [productId]);
@@ -109,39 +124,77 @@ router.post('/products', async (req, res) => {
 router.put('/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, is_featured, is_bestseller } = req.body;
+    const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, gallery, is_featured, is_bestseller, apply_price_to_variants } = req.body;
 
     if (!title || base_price == null || !category_id) {
-      return res.status(400).json({ error: 'Title, base price, and category are required' });
+      return res.status(400).json({ error: 'Title, original price, and category are required' });
     }
 
     const basePrice = Number(base_price);
-    // Accept null/''/undefined as "no sale price"; otherwise must be a valid number
+    // Accept null/''/undefined as "no offer"; otherwise must be a valid number
     const salePrice = sale_price === null || sale_price === '' || sale_price === undefined
       ? null
       : Number(sale_price);
 
     if (Number.isNaN(basePrice) || basePrice <= 0) {
-      return res.status(400).json({ error: 'Base price must be a positive number' });
+      return res.status(400).json({ error: 'Original price must be a positive number' });
     }
     if (salePrice !== null && (Number.isNaN(salePrice) || salePrice <= 0)) {
-      return res.status(400).json({ error: 'Sale price must be a positive number' });
+      return res.status(400).json({ error: 'Offer price must be a positive number' });
+    }
+    if (salePrice !== null && salePrice >= basePrice) {
+      return res.status(400).json({ error: 'Offer price must be lower than the original price' });
     }
 
-    const result = await runQuery(`
+    // Load the current row first: we need the OLD effective price to know
+    // which variants were "following" it, and to preserve the gallery when
+    // the client doesn't send one.
+    const existing = await getQuery('SELECT * FROM products WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Gallery: array of image URLs. When the client doesn't send one, keep
+    // the existing gallery untouched.
+    let galleryJson = existing.gallery_json;
+    if (Array.isArray(gallery)) {
+      const cleaned = gallery.filter((g) => typeof g === 'string' && g.trim() !== '');
+      if (cleaned.length > 0) {
+        galleryJson = JSON.stringify(cleaned);
+      } else if (image_url) {
+        galleryJson = JSON.stringify([image_url]);
+      }
+    }
+
+    await runQuery(`
       UPDATE products SET
         title = ?, subtitle = ?, description = ?, category_id = ?, base_price = ?, sale_price = ?,
         gender = ?, concentration = ?, top_notes = ?, heart_notes = ?, base_notes = ?,
-        longevity = ?, sillage = ?, image_url = ?, is_featured = ?, is_bestseller = ?
+        longevity = ?, sillage = ?, image_url = ?, gallery_json = ?, is_featured = ?, is_bestseller = ?
       WHERE id = ?
     `, [
       title, subtitle || '', description || '', category_id, basePrice, salePrice,
       gender || 'Unisex', concentration || 'Extrait de Parfum', top_notes || '', heart_notes || '', base_notes || '',
-      longevity || '12+ Hours', sillage || 'Intense', image_url, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
+      longevity || '12+ Hours', sillage || 'Intense', image_url, galleryJson, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
     ]);
 
-    if (!result.changes) {
-      return res.status(404).json({ error: 'Product not found' });
+    // Variant price sync — keeps the shop from ever showing a stale price.
+    // 1) Smart-follow (always): variants priced at the OLD effective price
+    //    (offer price, or original when no offer) follow the new one.
+    //    Variants with custom per-size prices are preserved.
+    const oldEffective = existing.sale_price != null ? Number(existing.sale_price) : Number(existing.base_price);
+    const newEffective = salePrice !== null ? salePrice : basePrice;
+    if (newEffective !== oldEffective) {
+      await runQuery(
+        `UPDATE variants SET price = ? WHERE product_id = ? AND price = ?`,
+        [newEffective, id, oldEffective]
+      );
+    }
+
+    // 2) Full sync (opt-in from the admin form): force EVERY size to the new
+    //    price — repairs prices that went stale before this sync existed.
+    if (apply_price_to_variants) {
+      await runQuery(`UPDATE variants SET price = ? WHERE product_id = ?`, [newEffective, id]);
     }
 
     const updated = await getQuery('SELECT * FROM products WHERE id = ?', [id]);

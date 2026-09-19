@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [imageError, setImageError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [savingProduct, setSavingProduct] = useState(false);
+  const [applyPriceToVariants, setApplyPriceToVariants] = useState(false);
 
   // Form State for Product Add/Edit
   const [productForm, setProductForm] = useState({
@@ -47,6 +48,8 @@ export default function AdminDashboard() {
     is_featured: true,
     is_bestseller: false
   });
+  const [gallery, setGallery] = useState([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
 
   // Orders State
   const [orders, setOrders] = useState([]);
@@ -151,8 +154,13 @@ export default function AdminDashboard() {
       // Coerce empty optional numeric fields to null — Postgres rejects "" for REAL columns
       const payload = {
         ...productForm,
-        sale_price: productForm.sale_price === '' ? null : Number(productForm.sale_price)
+        sale_price: productForm.sale_price === '' ? null : Number(productForm.sale_price),
+        gallery
       };
+
+      // Opt-in full variant price sync (checkbox in the modal) — force every
+      // size to the new price. Repairs prices that went stale earlier.
+      if (applyPriceToVariants) payload.apply_price_to_variants = true;
 
       const res = await fetch(url, {
         method,
@@ -313,10 +321,55 @@ export default function AdminDashboard() {
     }
   };
 
+  // Upload one or more gallery images; appends URLs to the gallery list.
+  const handleGalleryUpload = async (files) => {
+    if (!files || files.length === 0) return;
+    setUploadingGallery(true);
+    setImageError('');
+    const uploaded = [];
+    let lastError = '';
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const res = await fetch('/api/admin/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          uploaded.push(data.url);
+        } else {
+          lastError = data.error || 'Upload failed';
+        }
+      } catch (e) {
+        lastError = e.message || 'Upload failed';
+      }
+    }
+    if (uploaded.length > 0) {
+      setGallery((g) => [...g, ...uploaded]);
+      // First gallery image becomes the cover if none is set yet
+      setProductForm((f) => (f.image_url && f.image_url !== '/images/oud_royal.jpg' ? f : { ...f, image_url: uploaded[0] }));
+    }
+    if (lastError) setImageError(lastError);
+    setUploadingGallery(false);
+  };
+
+  const removeGalleryImage = (url) => {
+    setGallery((g) => g.filter((u) => u !== url));
+  };
+
+  const setGalleryCover = (url) => {
+    setProductForm((f) => ({ ...f, image_url: url }));
+  };
+
   const openAddProductModal = () => {
     setEditingProduct(null);
     setImageError('');
     setSaveError('');
+    setApplyPriceToVariants(false);
+    setGallery([]);
     setProductForm({
       title: '',
       subtitle: '',
@@ -342,6 +395,14 @@ export default function AdminDashboard() {
     setEditingProduct(p);
     setImageError('');
     setSaveError('');
+    setApplyPriceToVariants(false);
+    let gal = [];
+    if (p.gallery && Array.isArray(p.gallery)) {
+      gal = p.gallery;
+    } else if (p.gallery_json) {
+      try { gal = JSON.parse(p.gallery_json); } catch { gal = []; }
+    }
+    setGallery(gal);
     setProductForm({
       title: p.title,
       subtitle: p.subtitle || '',
@@ -499,7 +560,10 @@ export default function AdminDashboard() {
                   <div className="flex-1">
                     <span className="text-[10px] uppercase text-gold font-bold block">{p.concentration}</span>
                     <h3 className="font-sans font-bold text-base text-ivory">{p.title}</h3>
-                    <div className="font-num font-bold text-gold mt-1">{formatPrice(p.base_price)}</div>
+                    <div className="font-num font-bold text-gold mt-1">
+                      {formatPrice(p.sale_price || p.base_price)}
+                      {p.sale_price ? <span className="text-muted line-through font-normal ml-2">{formatPrice(p.base_price)}</span> : null}
+                    </div>
                   </div>
                 </div>
 
@@ -833,16 +897,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-muted block mb-1">Base Price (₹)</label>
-                  <input
-                    type="number"
-                    value={productForm.base_price}
-                    onChange={(e) => setProductForm({ ...productForm, base_price: Number(e.target.value) })}
-                    required
-                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
-                  />
-                </div>
-                <div>
                   <label className="text-muted block mb-1">Gender</label>
                   <select
                     value={productForm.gender}
@@ -853,6 +907,34 @@ export default function AdminDashboard() {
                     <option>For Him</option>
                     <option>For Her</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-muted block mb-1">Original Price (₹) — shown struck-through</label>
+                  <input
+                    type="number"
+                    value={productForm.base_price}
+                    onChange={(e) => setProductForm({ ...productForm, base_price: Number(e.target.value) })}
+                    required
+                    min="1"
+                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-muted block mb-1">Offer Price (₹) — what customers pay</label>
+                  <input
+                    type="number"
+                    value={productForm.sale_price}
+                    onChange={(e) => setProductForm({ ...productForm, sale_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                    min="1"
+                    placeholder="Leave empty for no offer"
+                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                  />
+                  {productForm.sale_price !== '' && Number(productForm.sale_price) >= Number(productForm.base_price) && (
+                    <p className="text-[11px] text-red-400 mt-1">Offer price must be lower than the original price</p>
+                  )}
                 </div>
               </div>
 
@@ -892,7 +974,7 @@ export default function AdminDashboard() {
                         value={productForm.image_url}
                         onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
                         placeholder="/images/oud_royal.jpg or https://…"
-                        className="mt-2 w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
+                        className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
                       />
                     </details>
                   </div>
@@ -929,6 +1011,64 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Multi-Image Gallery */}
+              <div className="space-y-2">
+                <label className="text-muted block">Product Gallery — all images shown on the product page</label>
+                {gallery.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {gallery.map((url) => (
+                      <div
+                        key={url}
+                        className={`relative w-20 h-20 rounded-lg overflow-hidden border group ${
+                          productForm.image_url === url ? 'border-gold ring-2 ring-gold/50' : 'border-gold/20'
+                        }`}
+                      >
+                        <img src={url} alt="Gallery" className="w-full h-full object-cover" />
+                        {productForm.image_url === url ? (
+                          <span className="absolute bottom-0 inset-x-0 bg-gold text-charcoal text-[8px] font-bold uppercase text-center py-0.5">
+                            Cover
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setGalleryCover(url)}
+                            className="absolute bottom-0 inset-x-0 bg-obsidian/80 text-ivory text-[8px] font-bold uppercase text-center py-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gold hover:text-charcoal"
+                          >
+                            Set Cover
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(url)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-obsidian/80 hover:bg-red-500 text-ivory rounded-full flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remove image"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="inline-block cursor-pointer btn-outline-gold px-4 py-2 text-xs uppercase font-bold">
+                  {uploadingGallery ? 'Uploading…' : '+ Add More Images'}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    className="hidden"
+                    disabled={uploadingGallery}
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) handleGalleryUpload(files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <p className="text-[10px] text-muted">
+                  First image is the cover (shown in shop grid). All images appear in the product page gallery.
+                </p>
+              </div>
+
               <div>
                 <label className="text-muted block mb-1">Full Olfactory Description</label>
                 <textarea
@@ -939,7 +1079,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="flex gap-4 pt-2">
+              <div className="flex gap-4 pt-2 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -958,6 +1098,17 @@ export default function AdminDashboard() {
                   />
                   <span>Bestseller Badge</span>
                 </label>
+                {editingProduct && (
+                  <label className="flex items-center gap-2 cursor-pointer" title="Forces every size variant to the new price — use to repair stale prices">
+                    <input
+                      type="checkbox"
+                      checked={applyPriceToVariants}
+                      onChange={(e) => setApplyPriceToVariants(e.target.checked)}
+                      className="accent-gold"
+                    />
+                    <span>Apply price to all sizes</span>
+                  </label>
+                )}
               </div>
 
               {saveError && (

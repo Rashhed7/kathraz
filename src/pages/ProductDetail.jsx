@@ -157,18 +157,23 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* Pricing Display */}
+          {/* Pricing Display — offer price with struck-through original */}
           <div className="p-4 rounded-xl bg-card border border-gold/20 flex items-baseline justify-between">
             <div>
-              <span className="text-xs text-muted block uppercase">Selected Price</span>
+              <span className="text-xs text-muted block uppercase">
+                {product.sale_price ? 'Offer Price' : 'Price'}
+              </span>
               <span className="font-num text-3xl font-bold text-gold">
-                {formatPrice(selectedVariant ? selectedVariant.price : product.base_price)}
+                {formatPrice(selectedVariant ? selectedVariant.price : (product.sale_price || product.base_price))}
               </span>
             </div>
             {product.sale_price && (
-              <span className="text-xs text-muted line-through">
-                {formatPrice(product.base_price)}
-              </span>
+              <div className="text-right">
+                <span className="text-xs text-muted block uppercase">Original</span>
+                <span className="font-num text-sm text-muted line-through">
+                  {formatPrice(product.base_price)}
+                </span>
+              </div>
             )}
           </div>
 

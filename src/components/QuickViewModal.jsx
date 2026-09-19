@@ -55,9 +55,16 @@ export default function QuickViewModal({ product, onClose }) {
               <span className="text-ivory font-semibold">{product.avg_rating || '5.0'}</span>
             </div>
 
-            {/* Price */}
-            <div className="mt-4 font-num text-2xl font-bold text-gold">
-              {formatPrice(selectedVariant ? selectedVariant.price : product.base_price)}
+            {/* Price — offer price with struck-through original */}
+            <div className="mt-4 flex items-baseline gap-3">
+              <span className="font-num text-2xl font-bold text-gold">
+                {formatPrice(selectedVariant ? selectedVariant.price : (product.sale_price || product.base_price))}
+              </span>
+              {product.sale_price && (
+                <span className="font-num text-sm text-muted line-through">
+                  {formatPrice(product.base_price)}
+                </span>
+              )}
             </div>
 
             <p className="text-xs text-ivory/80 leading-relaxed mt-3 font-light">
