@@ -27,7 +27,6 @@ export default function AdminDashboard() {
   const [imageError, setImageError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [savingProduct, setSavingProduct] = useState(false);
-  const [applyPriceToVariants, setApplyPriceToVariants] = useState(false);
 
   // Form State for Product Add/Edit
   const [productForm, setProductForm] = useState({
@@ -50,6 +49,10 @@ export default function AdminDashboard() {
   });
   const [gallery, setGallery] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
+
+  // Sizes & Pricing (variants) editor state
+  const emptyVariant = () => ({ id: null, size_label: '', price: '', stock_quantity: '' });
+  const [variants, setVariants] = useState([]);
 
   // Orders State
   const [orders, setOrders] = useState([]);
@@ -152,15 +155,34 @@ export default function AdminDashboard() {
       const method = editingProduct ? 'PUT' : 'POST';
 
       // Coerce empty optional numeric fields to null — Postgres rejects "" for REAL columns
+      const newSale = productForm.sale_price === '' ? null : Number(productForm.sale_price);
+      const newOriginal = Number(productForm.base_price);
+      const newEffective = newSale !== null ? newSale : newOriginal;
+
+      // When the offer/original price changes, sizes that were following the
+      // old effective price follow the new one automatically (custom per-size
+      // prices entered by hand are preserved).
+      const oldEffective = editingProduct
+        ? (editingProduct.sale_price != null ? Number(editingProduct.sale_price) : Number(editingProduct.base_price))
+        : null;
+
       const payload = {
         ...productForm,
-        sale_price: productForm.sale_price === '' ? null : Number(productForm.sale_price),
-        gallery
+        sale_price: newSale,
+        gallery,
+        variants: variants.map((v) => {
+          let price = Number(v.price);
+          if (oldEffective != null && price === oldEffective) {
+            price = newEffective;
+          }
+          return {
+            id: v.id || undefined,
+            size_label: v.size_label,
+            price,
+            stock_quantity: v.stock_quantity === '' ? 0 : Number(v.stock_quantity)
+          };
+        })
       };
-
-      // Opt-in full variant price sync (checkbox in the modal) — force every
-      // size to the new price. Repairs prices that went stale earlier.
-      if (applyPriceToVariants) payload.apply_price_to_variants = true;
 
       const res = await fetch(url, {
         method,
@@ -176,10 +198,15 @@ export default function AdminDashboard() {
       if (res.ok) {
         setShowProductModal(false);
         setEditingProduct(null);
+        // Surface non-fatal notices from the backend (e.g. a size kept
+        // because past orders reference it)
+        if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+          window.alert(data.warnings.join('\n'));
+        }
         loadDashboardData();
-      } else {
-        setSaveError(data.error || `Save failed (${res.status})`);
+        return;
       }
+      setSaveError(data.error || `Save failed (${res.status})`);
     } catch (e) {
       console.error(e);
       setSaveError(e.message || 'Network error while saving');
@@ -368,8 +395,8 @@ export default function AdminDashboard() {
     setEditingProduct(null);
     setImageError('');
     setSaveError('');
-    setApplyPriceToVariants(false);
     setGallery([]);
+    setVariants([{ ...emptyVariant(), size_label: '50ml', price: 9800, stock_quantity: 50 }]);
     setProductForm({
       title: '',
       subtitle: '',
@@ -395,7 +422,14 @@ export default function AdminDashboard() {
     setEditingProduct(p);
     setImageError('');
     setSaveError('');
-    setApplyPriceToVariants(false);
+    setVariants(
+      (p.variants && p.variants.length > 0 ? p.variants : []).map((v) => ({
+        id: v.id,
+        size_label: v.size_label,
+        price: v.price,
+        stock_quantity: v.stock_quantity
+      }))
+    );
     let gal = [];
     if (p.gallery && Array.isArray(p.gallery)) {
       gal = p.gallery;
@@ -938,6 +972,72 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Sizes & Pricing (per-size editor) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-muted">Sizes & Pricing — what customers select on the product page</label>
+                  <button
+                    type="button"
+                    onClick={() => setVariants([...variants, { ...emptyVariant() }])}
+                    className="btn-outline-gold px-3 py-1.5 rounded text-[10px] font-bold uppercase flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add Size
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {variants.map((v, idx) => (
+                    <div key={v.id || `new-${idx}`} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={v.size_label}
+                        onChange={(e) => {
+                          const next = [...variants];
+                          next[idx] = { ...v, size_label: e.target.value };
+                          setVariants(next);
+                        }}
+                        placeholder="Size (e.g. 50ml Extrait)"
+                        className="flex-1 bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        value={v.price}
+                        onChange={(e) => {
+                          const next = [...variants];
+                          next[idx] = { ...v, price: e.target.value };
+                          setVariants(next);
+                        }}
+                        placeholder="Price ₹"
+                        className="w-24 bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        value={v.stock_quantity}
+                        onChange={(e) => {
+                          const next = [...variants];
+                          next[idx] = { ...v, stock_quantity: e.target.value };
+                          setVariants(next);
+                        }}
+                        placeholder="Stock"
+                        className="w-20 bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVariants(variants.filter((_, i) => i !== idx))}
+                        className="p-2 bg-red-50 hover:bg-red-100 border border-red-400 text-red-700 rounded"
+                        title="Remove this size"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted">
+                  Each size gets its own price and stock. Sizes referenced by past orders can't be deleted — you'll be warned after saving.
+                </p>
+              </div>
+
               <div>
                 <label className="text-muted block mb-1">Product Image</label>
                 <div className="flex items-start gap-4">
@@ -1098,17 +1198,6 @@ export default function AdminDashboard() {
                   />
                   <span>Bestseller Badge</span>
                 </label>
-                {editingProduct && (
-                  <label className="flex items-center gap-2 cursor-pointer" title="Forces every size variant to the new price — use to repair stale prices">
-                    <input
-                      type="checkbox"
-                      checked={applyPriceToVariants}
-                      onChange={(e) => setApplyPriceToVariants(e.target.checked)}
-                      className="accent-gold"
-                    />
-                    <span>Apply price to all sizes</span>
-                  </label>
-                )}
               </div>
 
               {saveError && (

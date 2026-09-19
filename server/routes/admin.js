@@ -96,12 +96,23 @@ router.post('/products', async (req, res) => {
     const productId = result.lastID;
 
     // Add variants if provided
-    if (variants && Array.isArray(variants)) {
+    if (variants && Array.isArray(variants) && variants.length > 0) {
+      const seen = new Set();
       for (let v of variants) {
+        const sizeLabel = (v.size_label || '').trim();
+        const vPrice = Number(v.price);
+        if (!sizeLabel || Number.isNaN(vPrice) || vPrice <= 0) {
+          return res.status(400).json({ error: 'Every size needs a name and a price greater than 0' });
+        }
+        const key = sizeLabel.toLowerCase();
+        if (seen.has(key)) {
+          return res.status(400).json({ error: `Duplicate size name: "${sizeLabel}"` });
+        }
+        seen.add(key);
         await runQuery(`
           INSERT INTO variants (product_id, size_label, price, sku, stock_quantity)
           VALUES (?, ?, ?, ?, ?)
-        `, [productId, v.size_label, v.price, v.sku || `KTZ-${productId}-${v.size_label.replace(/\s+/g, '')}`, v.stock_quantity || 50]);
+        `, [productId, sizeLabel, vPrice, v.sku || `KTZ-${productId}-${sizeLabel.replace(/\s+/g, '')}`, Math.max(0, parseInt(v.stock_quantity, 10) || 50)]);
       }
     } else {
       // Default variant — priced at the effective (offer) price so the shop
@@ -124,7 +135,7 @@ router.post('/products', async (req, res) => {
 router.put('/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, gallery, is_featured, is_bestseller, apply_price_to_variants } = req.body;
+    const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, gallery, is_featured, is_bestseller, variants } = req.body;
 
     if (!title || base_price == null || !category_id) {
       return res.status(400).json({ error: 'Title, original price, and category are required' });
@@ -191,14 +202,50 @@ router.put('/products/:id', async (req, res) => {
       );
     }
 
-    // 2) Full sync (opt-in from the admin form): force EVERY size to the new
-    //    price — repairs prices that went stale before this sync existed.
-    if (apply_price_to_variants) {
-      await runQuery(`UPDATE variants SET price = ? WHERE product_id = ?`, [newEffective, id]);
+    // 2) Explicit size sync from the admin editor: update existing rows,
+    //    insert new sizes, and delete removed ones.
+    const warnings = [];
+    if (Array.isArray(variants)) {
+      const keepIds = [];
+      for (const v of variants) {
+        const sizeLabel = (v.size_label || '').trim();
+        const vPrice = Number(v.price);
+        const vStock = Math.max(0, parseInt(v.stock_quantity, 10) || 0);
+        if (!sizeLabel || Number.isNaN(vPrice) || vPrice <= 0) {
+          return res.status(400).json({ error: 'Every size needs a name and a price greater than 0' });
+        }
+        if (v.id) {
+          await runQuery(
+            `UPDATE variants SET size_label = ?, price = ?, stock_quantity = ? WHERE id = ? AND product_id = ?`,
+            [sizeLabel, vPrice, vStock, v.id, id]
+          );
+          keepIds.push(v.id);
+        } else {
+          const ins = await runQuery(
+            `INSERT INTO variants (product_id, size_label, price, sku, stock_quantity)
+             VALUES (?, ?, ?, ?, ?)`,
+            [id, sizeLabel, vPrice, `KTZ-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), vStock]
+          );
+          keepIds.push(ins.lastID);
+        }
+      }
+
+      // Delete sizes removed in the editor. Sizes referenced by past orders
+      // cannot be deleted (order history keeps them) — report instead.
+      const existingVariants = await allQuery('SELECT id, size_label FROM variants WHERE product_id = ?', [id]);
+      for (const ev of existingVariants) {
+        if (!keepIds.includes(ev.id)) {
+          try {
+            await runQuery('DELETE FROM variants WHERE id = ? AND product_id = ?', [ev.id, id]);
+          } catch (e) {
+            warnings.push(`Size "${ev.size_label}" has past orders and was kept`);
+          }
+        }
+      }
     }
 
     const updated = await getQuery('SELECT * FROM products WHERE id = ?', [id]);
-    res.json({ message: 'Product updated successfully', product: updated });
+    res.json({ message: 'Product updated successfully', product: updated, warnings });
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ error: 'Failed to update product' });
