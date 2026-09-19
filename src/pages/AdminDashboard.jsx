@@ -25,6 +25,8 @@ export default function AdminDashboard() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [savingProduct, setSavingProduct] = useState(false);
 
   // Form State for Product Add/Edit
   const [productForm, setProductForm] = useState({
@@ -138,11 +140,19 @@ export default function AdminDashboard() {
   // Create or Update Product
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+    setSaveError('');
+    setSavingProduct(true);
     try {
       const url = editingProduct
         ? `/api/admin/products/${editingProduct.id}`
         : '/api/admin/products';
       const method = editingProduct ? 'PUT' : 'POST';
+
+      // Coerce empty optional numeric fields to null — Postgres rejects "" for REAL columns
+      const payload = {
+        ...productForm,
+        sale_price: productForm.sale_price === '' ? null : Number(productForm.sale_price)
+      };
 
       const res = await fetch(url, {
         method,
@@ -150,16 +160,23 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(productForm)
+        body: JSON.stringify(payload)
       });
+
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setShowProductModal(false);
         setEditingProduct(null);
         loadDashboardData();
+      } else {
+        setSaveError(data.error || `Save failed (${res.status})`);
       }
     } catch (e) {
       console.error(e);
+      setSaveError(e.message || 'Network error while saving');
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -299,6 +316,7 @@ export default function AdminDashboard() {
   const openAddProductModal = () => {
     setEditingProduct(null);
     setImageError('');
+    setSaveError('');
     setProductForm({
       title: '',
       subtitle: '',
@@ -323,6 +341,7 @@ export default function AdminDashboard() {
   const openEditProductModal = (p) => {
     setEditingProduct(p);
     setImageError('');
+    setSaveError('');
     setProductForm({
       title: p.title,
       subtitle: p.subtitle || '',
@@ -941,8 +960,18 @@ export default function AdminDashboard() {
                 </label>
               </div>
 
-              <button type="submit" className="w-full btn-gold py-3 rounded-lg font-bold uppercase tracking-wider">
-                {editingProduct ? 'Save Changes' : 'Create Fragrance'}
+              {saveError && (
+                <div className="bg-red-500/10 border border-red-400/40 text-red-400 text-[11px] px-3 py-2 rounded">
+                  {saveError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingProduct}
+                className="w-full btn-gold py-3 rounded-lg font-bold uppercase tracking-wider disabled:opacity-60"
+              >
+                {savingProduct ? 'Saving…' : editingProduct ? 'Save Changes' : 'Create Fragrance'}
               </button>
             </form>
           </div>

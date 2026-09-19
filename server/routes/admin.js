@@ -111,20 +111,43 @@ router.put('/products/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const { title, subtitle, description, category_id, base_price, sale_price, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, is_featured, is_bestseller } = req.body;
 
-    await runQuery(`
+    if (!title || base_price == null || !category_id) {
+      return res.status(400).json({ error: 'Title, base price, and category are required' });
+    }
+
+    const basePrice = Number(base_price);
+    // Accept null/''/undefined as "no sale price"; otherwise must be a valid number
+    const salePrice = sale_price === null || sale_price === '' || sale_price === undefined
+      ? null
+      : Number(sale_price);
+
+    if (Number.isNaN(basePrice) || basePrice <= 0) {
+      return res.status(400).json({ error: 'Base price must be a positive number' });
+    }
+    if (salePrice !== null && (Number.isNaN(salePrice) || salePrice <= 0)) {
+      return res.status(400).json({ error: 'Sale price must be a positive number' });
+    }
+
+    const result = await runQuery(`
       UPDATE products SET
         title = ?, subtitle = ?, description = ?, category_id = ?, base_price = ?, sale_price = ?,
         gender = ?, concentration = ?, top_notes = ?, heart_notes = ?, base_notes = ?,
         longevity = ?, sillage = ?, image_url = ?, is_featured = ?, is_bestseller = ?
       WHERE id = ?
     `, [
-      title, subtitle, description, category_id, base_price, sale_price,
-      gender, concentration, top_notes, heart_notes, base_notes,
-      longevity, sillage, image_url, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
+      title, subtitle || '', description || '', category_id, basePrice, salePrice,
+      gender || 'Unisex', concentration || 'Extrait de Parfum', top_notes || '', heart_notes || '', base_notes || '',
+      longevity || '12+ Hours', sillage || 'Intense', image_url, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
     ]);
 
-    res.json({ message: 'Product updated successfully' });
+    if (!result.changes) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const updated = await getQuery('SELECT * FROM products WHERE id = ?', [id]);
+    res.json({ message: 'Product updated successfully', product: updated });
   } catch (error) {
+    console.error('Update product error:', error);
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
