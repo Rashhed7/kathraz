@@ -253,6 +253,20 @@ async function initDatabase() {
     ALTER TABLE instagram_posts ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'image'
   `);
 
+  // Promotional ad banners — full-width spotlight on the Home page
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS ad_banners (
+      id SERIAL PRIMARY KEY,
+      image_url TEXT NOT NULL,
+      headline TEXT,
+      subtext TEXT,
+      link_url TEXT,
+      position INTEGER DEFAULT 0,
+      active SMALLINT DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   await seedInitialData();
 }
 

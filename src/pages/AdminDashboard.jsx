@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight
+  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight, Megaphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -79,6 +79,14 @@ export default function AdminDashboard() {
   const [postLink, setPostLink] = useState('');
   const [postError, setPostError] = useState('');
 
+  // Ad banner state (Home page spotlight)
+  const [adBanners, setAdBanners] = useState([]);
+  const [uploadingAd, setUploadingAd] = useState(false);
+  const [adHeadline, setAdHeadline] = useState('');
+  const [adSubtext, setAdSubtext] = useState('');
+  const [adLink, setAdLink] = useState('');
+  const [adError, setAdError] = useState('');
+
   useEffect(() => {
     if (!token || !isAdmin) {
       navigate('/login?demo=admin');
@@ -151,6 +159,15 @@ export default function AdminDashboard() {
       if (resPosts.ok) {
         const data = await resPosts.json();
         setFeedPosts(data.posts || []);
+      }
+
+      // 8. Fetch ad banners
+      const resAds = await fetch('/api/admin/ads', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resAds.ok) {
+        const data = await resAds.json();
+        setAdBanners(data.ads || []);
       }
     } catch (e) {
       console.error(e);
@@ -409,6 +426,92 @@ export default function AdminDashboard() {
     }
   };
 
+  // Upload a wide photo straight into a new ad banner
+  const handleAdImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingAd(true);
+    setAdError('');
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      const addRes = await fetch('/api/admin/ads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          image_url: data.url,
+          headline: adHeadline,
+          subtext: adSubtext,
+          link_url: adLink
+        })
+      });
+      const addData = await addRes.json().catch(() => ({}));
+      if (!addRes.ok) {
+        throw new Error(addData.error || `Failed to save ad (server ${addRes.status})`);
+      }
+
+      setAdHeadline('');
+      setAdSubtext('');
+      setAdLink('');
+      loadDashboardData();
+    } catch (e) {
+      setAdError(e.message || 'Upload failed');
+    } finally {
+      setUploadingAd(false);
+    }
+  };
+
+  const handleMoveAd = async (id, direction) => {
+    try {
+      await fetch(`/api/admin/ads/${id}/move`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ direction })
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleAd = async (id) => {
+    try {
+      await fetch(`/api/admin/ads/${id}/toggle`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteAd = async (id) => {
+    if (!window.confirm('Delete this ad?')) return;
+    try {
+      await fetch(`/api/admin/ads/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Upload an image to Supabase Storage via the backend, then set the URL.
   const handleImageUpload = async (file) => {
     if (!file) return;
@@ -584,6 +687,7 @@ export default function AdminDashboard() {
           { id: 'customers', label: `Customers (${customers.length})`, icon: Users },
           { id: 'inquiries', label: `Inquiries${newInquiriesCount > 0 ? ` (${newInquiriesCount})` : ''}`, icon: Inbox },
           { id: 'posts', label: `Reels (${feedPosts.length})`, icon: Instagram },
+          { id: 'ads', label: `Ads (${adBanners.length})`, icon: Megaphone },
           { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -931,6 +1035,133 @@ export default function AdminDashboard() {
                       onClick={() => handleDeletePost(post.id)}
                       className="p-1.5 border border-ivory/20 rounded hover:bg-ivory hover:text-obsidian"
                       title="Delete post"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: ADS */}
+      {activeTab === 'ads' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Create an ad */}
+          <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-4">
+            <h3 className="font-sans text-base font-bold text-ivory">Add an ad to the Home page spotlight</h3>
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <label className="inline-block cursor-pointer btn-gold px-5 py-2.5 text-xs uppercase font-bold whitespace-nowrap">
+                {uploadingAd ? 'Uploading…' : 'Upload ad photo (wide works best)'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  className="hidden"
+                  disabled={uploadingAd}
+                  onChange={(e) => {
+                    const f = e.target.files && e.target.files[0];
+                    if (f) handleAdImageUpload(f);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  value={adHeadline}
+                  onChange={(e) => setAdHeadline(e.target.value)}
+                  placeholder="Headline (optional)"
+                  maxLength={80}
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={adSubtext}
+                  onChange={(e) => setAdSubtext(e.target.value)}
+                  placeholder="Sub-text (optional)"
+                  maxLength={140}
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+                <input
+                  type="url"
+                  value={adLink}
+                  onChange={(e) => setAdLink(e.target.value)}
+                  placeholder="Link (optional) — product or page URL"
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted">
+              Headline, sub-text and link are applied to the photo you upload next. Wide photos
+              (roughly 21:9, e.g. 1600×680) fill the spotlight best. New ads appear first.
+            </p>
+            {adError && <p className="text-[11px] text-ivory">{adError}</p>}
+          </div>
+
+          {/* Existing ads */}
+          {adBanners.length === 0 ? (
+            <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+              No ads yet. Upload a photo and it will appear in the Home page spotlight.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {adBanners.map((ad, idx) => (
+                <div
+                  key={ad.id}
+                  className={`bg-card border rounded-2xl overflow-hidden shadow-xl glass-panel ${
+                    ad.active === 1 ? 'border-gold/20' : 'border-gold/10 opacity-60'
+                  }`}
+                >
+                  <div className="relative aspect-[21/9] bg-obsidian">
+                    <img src={ad.image_url} alt={ad.headline || 'Ad'} className="w-full h-full object-cover" />
+                    {ad.active === 0 && (
+                      <span className="absolute top-2 left-2 bg-obsidian/85 text-ivory text-[9px] uppercase tracking-wider px-2 py-0.5 rounded">
+                        Hidden
+                      </span>
+                    )}
+                    {idx === 0 && ad.active === 1 && (
+                      <span className="absolute top-2 right-2 bg-ivory text-obsidian text-[9px] uppercase tracking-wider px-2 py-0.5 rounded">
+                        Live now
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-1">
+                    {ad.headline && <p className="text-sm font-semibold text-ivory truncate">{ad.headline}</p>}
+                    {ad.subtext && <p className="text-[11px] text-muted truncate">{ad.subtext}</p>}
+                    {ad.link_url && <p className="text-[10px] text-muted truncate">Links to: {ad.link_url}</p>}
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 border-t border-gold/10">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleMoveAd(ad.id, 'up')}
+                        disabled={idx === 0}
+                        className="p-1.5 border border-ivory/20 rounded disabled:opacity-30 hover:bg-ivory hover:text-obsidian"
+                        title="Move earlier"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveAd(ad.id, 'down')}
+                        disabled={idx === adBanners.length - 1}
+                        className="p-1.5 border border-ivory/20 rounded disabled:opacity-30 hover:bg-ivory hover:text-obsidian"
+                        title="Move later"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleAd(ad.id)}
+                        className="ml-1 px-2.5 py-1.5 border border-ivory/20 rounded text-[10px] font-bold uppercase hover:bg-ivory hover:text-obsidian"
+                        title={ad.active === 1 ? 'Hide from the site' : 'Show on the site'}
+                      >
+                        {ad.active === 1 ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteAd(ad.id)}
+                      className="p-1.5 border border-ivory/20 rounded hover:bg-ivory hover:text-obsidian"
+                      title="Delete ad"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

@@ -14,5 +14,5 @@ export const DELIVERY_NOTE = 'We deliver across India · 2–4 business days';
 
 // Instagram — shown in the Home page feed section header.
 // Leave INSTAGRAM_HANDLE empty to hide the handle (section still shows if posts exist).
-export const INSTAGRAM_HANDLE = '@kathraz';
-export const INSTAGRAM_URL = 'https://instagram.com/kathraz';
+export const INSTAGRAM_HANDLE = '@kathrazfragrances';
+export const INSTAGRAM_URL = 'https://www.instagram.com/kathrazfragrances?stkn=YzY2eDhjdjVjNDBo';

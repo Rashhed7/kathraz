@@ -6,6 +6,7 @@ import QuickViewModal from '../components/QuickViewModal';
 import ScentFinder from '../components/ScentFinder';
 import InstagramFeed from '../components/InstagramFeed';
 import Reveal from '../components/Reveal';
+import AdBanner from '../components/AdBanner';
 import { useCart } from '../context/CartContext';
 
 export default function Home({ onOpenSearch }) {
@@ -137,6 +138,9 @@ export default function Home({ onOpenSearch }) {
           </Reveal>
         </div>
       </section>
+
+      {/* AD SPOTLIGHT — admin-managed promo banners */}
+      <AdBanner />
 
       {/* CATEGORY — single honest band */}
       <section className="border-y border-ivory/10 bg-charcoal/40">

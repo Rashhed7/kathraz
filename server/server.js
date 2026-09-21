@@ -13,6 +13,7 @@ const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 const inquiryRoutes = require('./routes/inquiries');
 const postRoutes = require('./routes/posts');
+const adRoutes = require('./routes/ads');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin', uploadRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/ads', adRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

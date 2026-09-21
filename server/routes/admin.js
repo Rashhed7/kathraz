@@ -437,4 +437,78 @@ router.delete('/posts/:id', async (req, res) => {
   }
 });
 
+// 7. Ad Banners (Home page spotlight)
+router.get('/ads', async (req, res) => {
+  try {
+    const ads = await allQuery('SELECT * FROM ad_banners ORDER BY position ASC, id ASC');
+    res.json({ ads });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch ads' });
+  }
+});
+
+router.post('/ads', async (req, res) => {
+  try {
+    const { image_url, headline, subtext, link_url } = req.body;
+    if (!image_url) {
+      return res.status(400).json({ error: 'An image is required' });
+    }
+    const posRes = await getQuery('SELECT MIN(position) as minPos FROM ad_banners');
+    const position = posRes && posRes.minPos != null ? posRes.minPos - 1 : 0;
+    const created = await runQuery(
+      'INSERT INTO ad_banners (image_url, headline, subtext, link_url, position) VALUES (?, ?, ?, ?, ?)',
+      [image_url, headline || '', subtext || '', link_url || '', position]
+    );
+    const ad = await getQuery('SELECT * FROM ad_banners WHERE id = ?', [created.lastID]);
+    res.status(201).json({ message: 'Ad created', ad });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create ad' });
+  }
+});
+
+// Move an ad one slot left/right in the rotation
+router.put('/ads/:id/move', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { direction } = req.body; // 'up' | 'down'
+    const ads = await allQuery('SELECT id FROM ad_banners ORDER BY position ASC, id ASC');
+    const idx = ads.findIndex((a) => a.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Ad not found' });
+    const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= ads.length) {
+      return res.json({ message: 'Already at the edge' });
+    }
+    const a = ads[idx];
+    const b = ads[swapWith];
+    await runQuery('UPDATE ad_banners SET position = ? WHERE id = ?', [swapWith, a.id]);
+    await runQuery('UPDATE ad_banners SET position = ? WHERE id = ?', [idx, b.id]);
+    res.json({ message: 'Order updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to reorder ads' });
+  }
+});
+
+// Show/hide an ad without deleting it
+router.put('/ads/:id/toggle', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ad = await getQuery('SELECT * FROM ad_banners WHERE id = ?', [id]);
+    if (!ad) return res.status(404).json({ error: 'Ad not found' });
+    await runQuery('UPDATE ad_banners SET active = ? WHERE id = ?', [ad.active === 1 ? 0 : 1, id]);
+    res.json({ message: 'Ad updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update ad' });
+  }
+});
+
+router.delete('/ads/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await runQuery('DELETE FROM ad_banners WHERE id = ?', [id]);
+    res.json({ message: 'Ad deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete ad' });
+  }
+});
+
 module.exports = router;
