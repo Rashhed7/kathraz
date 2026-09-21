@@ -99,7 +99,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const shippingFee = subtotal >= 5000 ? 0 : 350;
+    const shippingFee = subtotal >= 5000 ? 0 : 59;
     const totalAmount = Math.max(0, subtotal - discountAmount + shippingFee);
 
     // Generate Order Number KTZ-XXXXX

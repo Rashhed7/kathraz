@@ -94,7 +94,7 @@ export const CartProvider = ({ children }) => {
     }
   }
 
-  const shippingINR = subtotalINR >= 5000 || cart.length === 0 ? 0 : 350;
+  const shippingINR = subtotalINR >= 5000 || cart.length === 0 ? 0 : 59;
   const totalINR = Math.max(0, subtotalINR - discountINR + shippingINR);
 
   const formatPrice = (amountINR) => {
