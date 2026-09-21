@@ -7,17 +7,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Warm cream surfaces, espresso text, muted antique-brass accent.
-        obsidian: '#FAF7F0',
-        charcoal: '#F1EBDD',
-        'charcoal-light': '#E9E1CF',
+        // Strict two-tone system: white surfaces, black ink.
+        // Legacy token names are kept as neutral aliases so existing
+        // class names (bg-obsidian, text-ivory, border-gold…) map to
+        // black/white/gray — no color anywhere.
+        obsidian: '#FFFFFF',
+        charcoal: '#F4F4F4',
+        'charcoal-light': '#E9E9E9',
         card: '#FFFFFF',
-        ivory: '#2B2118',
-        muted: '#8A7D6B',
-        gold: '#9C7A3C',
-        'gold-light': '#7E6330',
-        'gold-dark': '#B9995A',
-        bronze: '#8A6D45',
+        ivory: '#000000',
+        muted: '#6B6B6B',
+        gold: '#000000',
+        'gold-light': '#3D3D3D',
+        'gold-dark': '#3D3D3D',
+        bronze: '#3D3D3D',
       },
       fontFamily: {
         // Cinzel is reserved for the KATHRAZ wordmark; everything else is Plus Jakarta Sans

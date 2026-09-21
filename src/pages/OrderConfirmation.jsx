@@ -32,17 +32,17 @@ export default function OrderConfirmation() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-16 space-y-8 text-center">
-      <div className="w-20 h-20 rounded-full bg-gold/20 border-2 border-gold flex items-center justify-center mx-auto text-gold shadow-2xl animate-bounce">
+      <div className="w-20 h-20 rounded-full border-2 border-ivory flex items-center justify-center mx-auto text-ivory">
         <CheckCircle2 className="w-12 h-12" />
       </div>
 
       <div className="space-y-2">
-        <span className="text-xs uppercase tracking-[0.25em] text-gold font-semibold flex items-center justify-center gap-1">
-          Order Confirmed
+        <span className="text-xs uppercase tracking-[0.25em] text-muted font-semibold">
+          Order confirmed
         </span>
         <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">Thank you for your order</h1>
         <p className="text-xs text-muted font-light max-w-md mx-auto">
-          Your order has been recorded in the KATHRAZ vault. An official invoice and courier tracking details have been dispatched to your email.
+          A confirmation with your invoice and tracking details has been sent to your email.
         </p>
       </div>
 
@@ -78,7 +78,7 @@ export default function OrderConfirmation() {
 
           {/* Items Table */}
           <div className="space-y-3 border-t border-gold/15 pt-4">
-            <strong className="text-gold text-xs uppercase block">Ordered Fragrance Creations</strong>
+            <strong className="text-ivory text-xs uppercase block">Items</strong>
             {order.items && order.items.map((item) => (
               <div key={item.id} className="flex justify-between items-center text-xs p-2 rounded bg-obsidian border border-gold/10">
                 <div>
@@ -108,7 +108,7 @@ export default function OrderConfirmation() {
           to={`/track-order?query=${orderNumber}`}
           className="btn-gold px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2"
         >
-          <Truck className="w-4 h-4" /> Live Courier Tracking <ArrowRight className="w-4 h-4" />
+          <Truck className="w-4 h-4" /> Track order <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </div>

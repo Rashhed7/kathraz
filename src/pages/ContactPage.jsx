@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Phone, Send, CheckCircle2, Truck } from 'lucide-react';
 import { TEL_URL, WHATSAPP_URL, PHONE_DISPLAY, EMAIL_ADDRESS, DELIVERY_NOTE } from '../config/contact';
+import Reveal from '../components/Reveal';
 
 function WhatsAppIcon({ className }) {
   return (
@@ -56,7 +57,8 @@ export default function ContactPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         {/* Contact Form */}
-        <div className="md:col-span-7 bg-card border border-ivory/10 p-6 sm:p-8 space-y-6">
+        <Reveal variant="left" className="md:col-span-7">
+          <div className="bg-card border border-ivory/10 p-6 sm:p-8 space-y-6">
           {submitted ? (
             <div className="p-8 text-center space-y-4">
               <CheckCircle2 className="w-12 h-12 text-gold mx-auto" />
@@ -113,7 +115,7 @@ export default function ContactPage() {
               </div>
 
               {formError && (
-                <p className="text-[11px] text-red-600">{formError}</p>
+                <p className="text-[11px] text-ivory">{formError}</p>
               )}
 
               <button
@@ -125,10 +127,11 @@ export default function ContactPage() {
               </button>
             </form>
           )}
-        </div>
+          </div>
+        </Reveal>
 
         {/* Direct Contact */}
-        <div className="md:col-span-5 space-y-6">
+        <Reveal variant="right" delay={120} className="md:col-span-5 space-y-6">
           <div className="bg-card border border-ivory/10 p-6 space-y-4 text-xs">
             <h3 className="font-sans text-lg font-medium text-ivory">Talk to us directly</h3>
 
@@ -136,9 +139,9 @@ export default function ContactPage() {
               href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3.5 bg-[#25D366]/10 border border-[#25D366]/30 hover:border-[#25D366] transition-colors group"
+              className="flex items-center gap-3 p-3.5 bg-obsidian border border-ivory/10 hover:border-ivory/35 transition-colors group"
             >
-              <span className="w-9 h-9 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0">
+              <span className="w-9 h-9 rounded-full bg-ivory text-obsidian flex items-center justify-center flex-shrink-0">
                 <WhatsAppIcon className="w-5 h-5" />
               </span>
               <span>
@@ -176,7 +179,7 @@ export default function ContactPage() {
 
           <div className="bg-charcoal/50 border border-ivory/10 p-6 text-xs space-y-2">
             <div className="flex items-center gap-2 text-ivory">
-              <Truck className="w-4 h-4 text-gold" />
+              <Truck className="w-4 h-4 text-ivory" />
               <strong>We deliver across India</strong>
             </div>
             <p className="text-muted font-light leading-relaxed">
@@ -184,7 +187,7 @@ export default function ContactPage() {
               delivery available.
             </p>
           </div>
-        </div>
+        </Reveal>
       </div>
     </div>
   );

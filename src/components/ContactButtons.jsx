@@ -26,7 +26,7 @@ export default function ContactButtons() {
         href={TEL_URL}
         aria-label={`Call us on ${PHONE_DISPLAY}`}
         title={`Call ${PHONE_DISPLAY}`}
-        className="w-11 h-11 rounded-full bg-ivory text-obsidian shadow-lg flex items-center justify-center hover:bg-gold transition-colors"
+        className="w-12 h-12 rounded-full bg-ivory text-obsidian shadow-lg flex items-center justify-center hover:bg-charcoal-light transition-colors"
       >
         <Phone className="w-[18px] h-[18px]" />
       </a>
@@ -36,7 +36,7 @@ export default function ContactButtons() {
         rel="noopener noreferrer"
         aria-label="Chat with us on WhatsApp"
         title="Chat on WhatsApp"
-        className="w-12 h-12 rounded-full bg-[#25D366] text-white shadow-lg flex items-center justify-center hover:brightness-95 transition"
+        className="w-11 h-11 rounded-full bg-obsidian border border-ivory/20 text-ivory shadow-lg flex items-center justify-center hover:bg-ivory hover:text-obsidian transition-colors"
       >
         <WhatsAppIcon className="w-6 h-6" />
       </a>

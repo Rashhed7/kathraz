@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer
+  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -64,13 +64,20 @@ export default function AdminDashboard() {
   // Coupons State
   const [coupons, setCoupons] = useState([]);
 
-  // Inquiries State (customer messages from Contact page)
+  // Contact Inquiries State (customer messages from Contact page)
   const [inquiries, setInquiries] = useState([]);
   const newInquiriesCount = inquiries.filter((i) => i.status === 'new').length;
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponType, setNewCouponType] = useState('percentage');
   const [newCouponValue, setNewCouponValue] = useState(15);
   const [newCouponMin, setNewCouponMin] = useState(3000);
+
+  // Instagram feed posts state
+  const [feedPosts, setFeedPosts] = useState([]);
+  const [uploadingPost, setUploadingPost] = useState(false);
+  const [postCaption, setPostCaption] = useState('');
+  const [postLink, setPostLink] = useState('');
+  const [postError, setPostError] = useState('');
 
   useEffect(() => {
     if (!token || !isAdmin) {
@@ -135,6 +142,15 @@ export default function AdminDashboard() {
       if (resInquiries.ok) {
         const data = await resInquiries.json();
         setInquiries(data.inquiries || []);
+      }
+
+      // 7. Fetch Instagram feed posts
+      const resPosts = await fetch('/api/admin/posts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resPosts.ok) {
+        const data = await resPosts.json();
+        setFeedPosts(data.posts || []);
       }
     } catch (e) {
       console.error(e);
@@ -217,7 +233,7 @@ export default function AdminDashboard() {
 
   // Delete Product
   const handleDeleteProduct = async (id) => {
-    if (!window.confirm('Delete this luxury fragrance formulation?')) return;
+    if (!window.confirm('Delete this product?')) return;
     try {
       const res = await fetch(`/api/admin/products/${id}`, {
         method: 'DELETE',
@@ -306,6 +322,84 @@ export default function AdminDashboard() {
     if (!window.confirm('Delete this inquiry?')) return;
     try {
       await fetch(`/api/inquiries/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Upload a reel video or image straight into a new feed post
+  const handlePostMediaUpload = async (file) => {
+    if (!file) return;
+    setUploadingPost(true);
+    setPostError('');
+    const isVideo = file.type.startsWith('video/');
+    try {
+      const fd = new FormData();
+      if (isVideo) {
+        fd.append('video', file);
+      } else {
+        fd.append('image', file);
+      }
+      const res = await fetch(isVideo ? '/api/admin/upload-video' : '/api/admin/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      const addRes = await fetch('/api/admin/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          image_url: data.url,
+          caption: postCaption,
+          link_url: postLink,
+          media_type: isVideo ? 'video' : 'image'
+        })
+      });
+      const addData = await addRes.json().catch(() => ({}));
+      if (!addRes.ok) {
+        throw new Error(addData.error || `Failed to save post (server ${addRes.status})`);
+      }
+
+      setPostCaption('');
+      setPostLink('');
+      loadDashboardData();
+    } catch (e) {
+      setPostError(e.message || 'Upload failed');
+    } finally {
+      setUploadingPost(false);
+    }
+  };
+
+  const handleMovePost = async (id, direction) => {
+    try {
+      await fetch(`/api/admin/posts/${id}/move`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ direction })
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeletePost = async (id) => {
+    if (!window.confirm('Remove this post from the feed?')) return;
+    try {
+      await fetch(`/api/admin/posts/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -459,7 +553,7 @@ export default function AdminDashboard() {
   };
 
   if (loading) {
-    return <div className="py-32 text-center text-gold text-sm animate-pulse">Loading KATHRAZ Admin Suite...</div>;
+    return <div className="py-32 text-center text-muted text-sm">Loading dashboard…</div>;
   }
 
   return (
@@ -477,7 +571,7 @@ export default function AdminDashboard() {
           onClick={loadDashboardData}
           className="btn-outline-gold px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Sync Database
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
 
@@ -489,6 +583,7 @@ export default function AdminDashboard() {
           { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingBag },
           { id: 'customers', label: `Customers (${customers.length})`, icon: Users },
           { id: 'inquiries', label: `Inquiries${newInquiriesCount > 0 ? ` (${newInquiriesCount})` : ''}`, icon: Inbox },
+          { id: 'posts', label: `Reels (${feedPosts.length})`, icon: Instagram },
           { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -516,7 +611,7 @@ export default function AdminDashboard() {
             <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-2">
               <span className="text-xs text-muted uppercase tracking-wider font-medium">Total Gross Revenue</span>
               <div className="font-num text-3xl font-bold text-gold">{formatPrice(analytics.totalRevenue)}</div>
-              <span className="text-[10px] text-emerald-400 font-num">+18.4% vs last period</span>
+              <span className="text-[10px] text-muted font-num">All-time gross</span>
             </div>
 
             <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-2">
@@ -528,13 +623,13 @@ export default function AdminDashboard() {
             <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-2">
               <span className="text-xs text-muted uppercase tracking-wider font-medium">Registered Clients</span>
               <div className="font-num text-3xl font-bold text-ivory">{analytics.totalCustomers}</div>
-              <span className="text-[10px] text-gold font-num">VIP Members</span>
+              <span className="text-[10px] text-muted font-num">Registered accounts</span>
             </div>
 
             <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-2">
               <span className="text-xs text-muted uppercase tracking-wider font-medium">Active Formulations</span>
               <div className="font-num text-3xl font-bold text-ivory">{analytics.totalProducts}</div>
-              <span className="text-[10px] text-emerald-400 font-num">All in stock</span>
+              <span className="text-[10px] text-muted font-num">Listed</span>
             </div>
           </div>
 
@@ -577,12 +672,12 @@ export default function AdminDashboard() {
       {activeTab === 'products' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="flex justify-between items-center">
-            <h2 className="font-sans text-xl font-bold text-ivory">Catalog Management</h2>
+            <h2 className="font-sans text-xl font-bold text-ivory">Products</h2>
             <button
               onClick={openAddProductModal}
               className="btn-gold px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg"
             >
-              <Plus className="w-4 h-4" /> Add New Fragrance
+              <Plus className="w-4 h-4" /> Add product
             </button>
           </div>
 
@@ -615,8 +710,8 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => handleDeleteProduct(p.id)}
-                    className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-400 text-red-700 rounded text-xs font-bold"
-                    title="Delete formulation"
+                    className="px-3 py-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 text-ivory rounded text-xs font-bold"
+                    title="Delete product"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -730,6 +825,123 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* TAB: FEED POSTS */}
+      {activeTab === 'posts' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Add a post */}
+          <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-4">
+            <h3 className="font-sans text-base font-bold text-ivory">Add a reel to the Home page feed</h3>
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <label className="inline-block cursor-pointer btn-gold px-5 py-2.5 text-xs uppercase font-bold whitespace-nowrap">
+                {uploadingPost ? 'Uploading…' : 'Upload reel (MP4/MOV/WebM) or image'}
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/jpeg,image/png,image/webp,image/avif"
+                  className="hidden"
+                  disabled={uploadingPost}
+                  onChange={(e) => {
+                    const f = e.target.files && e.target.files[0];
+                    if (f) handlePostMediaUpload(f);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={postCaption}
+                  onChange={(e) => setPostCaption(e.target.value)}
+                  placeholder="Caption (optional) — shows on hover"
+                  maxLength={200}
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+                <input
+                  type="url"
+                  value={postLink}
+                  onChange={(e) => setPostLink(e.target.value)}
+                  placeholder="Link (optional) — e.g. an Instagram post URL"
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted">
+              Caption and link are applied to the file you upload next. Videos play muted and looping,
+              Instagram-style. Keep reels under 50 MB. New posts appear first in the feed.
+            </p>
+            {postError && <p className="text-[11px] text-ivory">{postError}</p>}
+          </div>
+
+          {/* Existing posts */}
+          {feedPosts.length === 0 ? (
+            <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+              No reels yet. Upload a video or image and it will appear in the Home page feed.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {feedPosts.map((post, idx) => (
+                <div key={post.id} className="bg-card border border-gold/20 rounded-2xl overflow-hidden shadow-xl glass-panel">
+                  <div className="relative aspect-square bg-obsidian">
+                    {post.media_type === 'video' ? (
+                      <video
+                        src={post.image_url}
+                        className="w-full h-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img src={post.image_url} alt={post.caption || 'Feed post'} className="w-full h-full object-cover" />
+                    )}
+                    {post.link_url && (
+                      <a
+                        href={post.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-2 right-2 bg-obsidian/80 text-ivory rounded-full p-1.5"
+                        title="Open link"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  {post.caption && (
+                    <p className="px-3 pt-2 text-[11px] text-muted line-clamp-2">{post.caption}</p>
+                  )}
+                  <div className="flex items-center justify-between p-2.5">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleMovePost(post.id, 'up')}
+                        disabled={idx === 0}
+                        className="p-1.5 border border-ivory/20 rounded disabled:opacity-30 hover:bg-ivory hover:text-obsidian"
+                        title="Move earlier"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleMovePost(post.id, 'down')}
+                        disabled={idx === feedPosts.length - 1}
+                        className="p-1.5 border border-ivory/20 rounded disabled:opacity-30 hover:bg-ivory hover:text-obsidian"
+                        title="Move later"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleDeletePost(post.id)}
+                      className="p-1.5 border border-ivory/20 rounded hover:bg-ivory hover:text-obsidian"
+                      title="Delete post"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* TAB 5: COUPONS */}
       {activeTab === 'coupons' && (
         <div className="space-y-6 animate-fadeIn">
@@ -803,7 +1015,7 @@ export default function AdminDashboard() {
                     </div>
                     <button
                       onClick={() => handleDeleteCoupon(cop.id)}
-                      className="text-red-400 hover:text-red-300 p-2"
+                      className="text-muted hover:text-ivory p-2"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -871,7 +1083,7 @@ export default function AdminDashboard() {
                     )}
                     <button
                       onClick={() => handleDeleteInquiry(inq.id)}
-                      className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-400 text-red-700 rounded text-[11px] font-bold"
+                      className="px-3 py-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 text-ivory rounded text-[11px] font-bold"
                     >
                       Delete
                     </button>
@@ -889,7 +1101,7 @@ export default function AdminDashboard() {
           <div className="w-full max-w-2xl bg-card border border-gold/40 rounded-2xl p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-gold/20 pb-4">
               <h3 className="font-sans text-lg font-bold text-gold">
-                {editingProduct ? 'Edit Fragrance Formulation' : 'Create New Fragrance'}
+                {editingProduct ? 'Edit product' : 'New product'}
               </h3>
               <button onClick={() => setShowProductModal(false)} className="text-muted hover:text-ivory">
                 <X className="w-5 h-5" />
@@ -942,6 +1154,16 @@ export default function AdminDashboard() {
                     <option>For Her</option>
                   </select>
                 </div>
+                <div>
+                  <label className="text-muted block mb-1">Concentration tag</label>
+                  <input
+                    type="text"
+                    value={productForm.concentration}
+                    onChange={(e) => setProductForm({ ...productForm, concentration: e.target.value })}
+                    placeholder="e.g. Extrait de Parfum"
+                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -967,7 +1189,7 @@ export default function AdminDashboard() {
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
                   />
                   {productForm.sale_price !== '' && Number(productForm.sale_price) >= Number(productForm.base_price) && (
-                    <p className="text-[11px] text-red-400 mt-1">Offer price must be lower than the original price</p>
+                    <p className="text-[11px] text-ivory mt-1">Offer price must be lower than the original price</p>
                   )}
                 </div>
               </div>
@@ -1025,7 +1247,7 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={() => setVariants(variants.filter((_, i) => i !== idx))}
-                        className="p-2 bg-red-50 hover:bg-red-100 border border-red-400 text-red-700 rounded"
+                        className="p-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 text-ivory rounded"
                         title="Remove this size"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1065,7 +1287,7 @@ export default function AdminDashboard() {
                       />
                     </label>
                     <p className="text-[10px] text-muted">JPG, PNG, WebP or AVIF · up to 5 MB</p>
-                    {imageError && <p className="text-[11px] text-red-500">{imageError}</p>}
+                    {imageError && <p className="text-[11px] text-ivory">{imageError}</p>}
                     {/* Advanced: direct URL */}
                     <details className="text-[11px] text-muted">
                       <summary className="cursor-pointer hover:text-ivory">Or paste an image URL</summary>
@@ -1140,7 +1362,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => removeGalleryImage(url)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-obsidian/80 hover:bg-red-500 text-ivory rounded-full flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 w-5 h-5 bg-obsidian/80 hover:bg-ivory hover:text-obsidian text-ivory rounded-full flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Remove image"
                         >
                           ×
@@ -1170,7 +1392,7 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="text-muted block mb-1">Full Olfactory Description</label>
+                <label className="text-muted block mb-1">Description</label>
                 <textarea
                   value={productForm.description}
                   onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
@@ -1198,10 +1420,8 @@ export default function AdminDashboard() {
                   />
                   <span>Bestseller Badge</span>
                 </label>
-              </div>
-
-              {saveError && (
-                <div className="bg-red-500/10 border border-red-400/40 text-red-400 text-[11px] px-3 py-2 rounded">
+              </div>                  {saveError && (
+                <div className="bg-charcoal border border-ivory/40 text-ivory text-[11px] px-3 py-2 rounded">
                   {saveError}
                 </div>
               )}
@@ -1211,7 +1431,7 @@ export default function AdminDashboard() {
                 disabled={savingProduct}
                 className="w-full btn-gold py-3 rounded-lg font-bold uppercase tracking-wider disabled:opacity-60"
               >
-                {savingProduct ? 'Saving…' : editingProduct ? 'Save Changes' : 'Create Fragrance'}
+                {savingProduct ? 'Saving…' : editingProduct ? 'Save changes' : 'Create product'}
               </button>
             </form>
           </div>

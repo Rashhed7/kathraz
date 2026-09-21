@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Star, ShoppingBag, Heart, ShieldCheck, Truck, Droplet, Clock, Flame, ChevronRight, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import Reveal from '../components/Reveal';
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -71,8 +72,8 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="py-32 text-center text-gold text-sm animate-pulse">
-        Unveiling Olfactory Masterpiece...
+      <div className="py-32 text-center text-muted text-sm">
+        Loading…
       </div>
     );
   }
@@ -80,8 +81,8 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div className="max-w-md mx-auto py-24 text-center space-y-4">
-        <h2 className="font-sans text-2xl font-bold text-ivory">Fragrance Not Found</h2>
-        <Link to="/shop" className="btn-gold inline-block px-6 py-2.5 text-xs uppercase font-bold">Return to Treasury</Link>
+        <h2 className="font-sans text-2xl font-bold text-ivory">Fragrance not found</h2>
+        <Link to="/shop" className="btn-gold inline-block px-6 py-2.5 text-xs uppercase font-bold">Back to Shop</Link>
       </div>
     );
   }
@@ -92,17 +93,17 @@ export default function ProductDetail() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
       {/* Breadcrumb */}
       <nav className="flex items-center space-x-2 text-xs text-muted font-light">
-        <Link to="/" className="hover:text-gold">Home</Link>
-        <ChevronRight className="w-3 h-3 text-gold/50" />
-        <Link to="/shop" className="hover:text-gold">Shop</Link>
-        <ChevronRight className="w-3 h-3 text-gold/50" />
+        <Link to="/" className="hover:text-ivory">Home</Link>
+        <ChevronRight className="w-3 h-3 text-muted/50" />
+        <Link to="/shop" className="hover:text-ivory">Shop</Link>
+        <ChevronRight className="w-3 h-3 text-muted/50" />
         <span className="text-gold font-medium">{product.title}</span>
       </nav>
 
       {/* Main Product Display */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         {/* Left Image Gallery */}
-        <div className="lg:col-span-6 space-y-4">
+        <Reveal variant="left" className="lg:col-span-6 space-y-4">
           <div className="relative aspect-square rounded-2xl overflow-hidden border border-gold/30 bg-obsidian shadow-2xl group">
             <img
               src={activeImage}
@@ -127,18 +128,18 @@ export default function ProductDetail() {
                 >
                   <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
                 </button>
-              ))}
+              )              )}
             </div>
           )}
-        </div>
+        </Reveal>
 
         {/* Right Product Details */}
-        <div className="lg:col-span-6 space-y-6">
+        <Reveal variant="right" delay={120} className="lg:col-span-6 space-y-6">
           <div>
             <div className="flex items-center justify-between gap-2 text-xs text-gold uppercase tracking-widest font-semibold flex-wrap">
-              <span>{product.category_name} • {product.gender}</span>
-              <span className="text-emerald-400 flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" /> In Stock (Batch #902)
+              <span>{product.category_name} · {product.gender}</span>
+              <span className="text-ivory flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> In stock
               </span>
             </div>
 
@@ -153,7 +154,7 @@ export default function ProductDetail() {
                 ))}
               </div>
               <span className="text-xs font-bold text-ivory">{product.avg_rating || '5.0'}</span>
-              <span className="text-xs text-muted">({product.review_count || 12} Verified Reviews)</span>
+              <span className="text-xs text-muted">({product.review_count || 0} Reviews)</span>
             </div>
           </div>
 
@@ -256,10 +257,10 @@ export default function ProductDetail() {
               <ShieldCheck className="w-4 h-4 text-gold" /> Sealed · Authentic Batch · Bottled in India
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
 
-      {/* Tabs: Olfactory Pyramid / Artisanal Craft / Reviews */}
+      {/* Tabs: Notes / Reviews */}
       <div className="space-y-8 border-t border-gold/15 pt-12">
         <div className="flex flex-wrap border-b border-gold/20 gap-4 sm:gap-8 text-xs sm:text-sm font-sans tracking-wider uppercase font-semibold">
           <button
@@ -268,7 +269,7 @@ export default function ProductDetail() {
               activeTab === 'notes' ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
             }`}
           >
-            Olfactory Pyramid
+            Fragrance notes
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
@@ -276,11 +277,11 @@ export default function ProductDetail() {
               activeTab === 'reviews' ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
             }`}
           >
-            Client Reviews ({product.reviews ? product.reviews.length : 0})
+            Reviews ({product.reviews ? product.reviews.length : 0})
           </button>
         </div>
 
-        {/* Tab 1: Olfactory Pyramid */}
+        {/* Tab 1: Notes */}
         {activeTab === 'notes' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-2">
@@ -314,11 +315,11 @@ export default function ProductDetail() {
           <div className="space-y-8 animate-fadeIn">
             {/* Submit Review */}
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-4">
-              <h3 className="font-sans text-lg font-bold text-ivory">Write a Client Review</h3>
+              <h3 className="font-sans text-lg font-bold text-ivory">Write a review</h3>
 
               {reviewSubmitted ? (
                 <div className="p-4 bg-gold/10 border border-gold/30 rounded-lg text-xs text-gold">
-                  Thank you! Your verified review has been published to your account.
+                  Thank you — your review has been submitted.
                 </div>
               ) : (
                 <form onSubmit={handleReviewSubmit} className="space-y-4 text-xs">
@@ -341,14 +342,13 @@ export default function ProductDetail() {
                         onChange={(e) => setReviewRating(Number(e.target.value))}
                         className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded-lg focus:outline-none focus:border-gold"
                       >
-                        <option value={5}>★★★★★ (5/5) Exceptional</option>
-                        <option value={4}>★★★★☆ (4/5) Very Good</option>
-                        <option value={3}>★★★☆☆ (3/5) Average</option>
+                        <option value={5}>5 — Excellent</option>
+                        <option value={4}>4 — Very good</option>
+                        <option value={3}>3 — Average</option>
                       </select>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-muted block mb-1">Your Olfactory Experience</label>
+                  <div>                      <label className="text-muted block mb-1">Your review</label>
                     <textarea
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
@@ -358,7 +358,7 @@ export default function ProductDetail() {
                     />
                   </div>
                   <button type="submit" className="btn-gold px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider">
-                    Submit Verified Review
+                    Submit review
                   </button>
                 </form>
               )}
@@ -371,7 +371,7 @@ export default function ProductDetail() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-sans font-bold text-ivory text-sm">{rev.user_name}</span>
-                      <span className="text-[10px] bg-gold/20 text-gold px-2 py-0.5 rounded font-num">VERIFIED</span>
+                      <span className="text-[10px] border border-ivory/30 text-muted px-2 py-0.5 rounded font-num">Verified purchase</span>
                     </div>
                     <div className="flex text-gold">
                       {[...Array(rev.rating)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-gold" />)}

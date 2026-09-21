@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Filter, SlidersHorizontal, Grid, List, Search, X, Heart } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import Reveal from '../components/Reveal';
 import QuickViewModal from '../components/QuickViewModal';
 import { useWishlist } from '../context/WishlistContext';
 
@@ -101,14 +102,14 @@ export default function Shop() {
       {/* Header Banner */}
       <div className="relative rounded-2xl bg-card border border-gold/20 p-8 sm:p-12 overflow-hidden shadow-2xl glass-panel">
         <div className="relative z-10 max-w-2xl space-y-3">
-          <span className="text-xs uppercase tracking-[0.25em] text-gold font-semibold flex items-center gap-1">
-            KATHRAZ Parfumerie Treasury
+          <span className="text-xs uppercase tracking-[0.25em] text-muted font-semibold flex items-center gap-1">
+            KATHRAZ
           </span>
           <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">
             {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Collection' : 'All Fragrances'}
           </h1>
           <p className="text-xs text-muted font-light leading-relaxed">
-            Browse our master-blended extrait de parfums, rare attar oils, and bespoke vehicle atmospheres.
+            Extrait de parfums and attar oils, blended and bottled in small batches.
           </p>
         </div>
       </div>
@@ -119,7 +120,7 @@ export default function Shop() {
         <aside className={`${showFilters ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-card border border-gold/20 rounded-2xl p-6 space-y-6 glass-panel lg:sticky lg:top-24`}>
           <div className="flex items-center justify-between border-b border-gold/15 pb-4">
             <div className="flex items-center gap-2 font-sans font-bold text-sm text-ivory">
-              <SlidersHorizontal className="w-4 h-4 text-gold" /> Filter Library
+              <SlidersHorizontal className="w-4 h-4 text-ivory" /> Filters
             </div>
             <button
               onClick={resetFilters}
@@ -225,7 +226,7 @@ export default function Shop() {
           <div className="bg-card border border-gold/20 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-muted">
-                Showing <strong className="text-gold">{displayedProducts.length}</strong> creations
+                Showing <strong className="text-ivory">{displayedProducts.length}</strong> products
               </span>
               {/* Mobile: collapsible filters */}
               <button
@@ -258,27 +259,28 @@ export default function Shop() {
 
           {/* Products Loading / Empty State */}
           {loading ? (
-            <div className="py-24 text-center text-gold text-sm animate-pulse">
-              Loading
+            <div className="py-24 text-center text-muted text-sm">
+              Loading…
             </div>
           ) : displayedProducts.length === 0 ? (
             <div className="text-center py-20 bg-card border border-gold/20 rounded-2xl space-y-4">
-              <p className="text-sm text-muted">No fragrances found matching your selected filters.</p>
+              <p className="text-sm text-muted">No fragrances match your filters.</p>
               <button
                 onClick={resetFilters}
                 className="btn-gold px-6 py-2.5 rounded-lg text-xs uppercase font-bold tracking-wider"
               >
-                Clear All Filters
+                Clear filters
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-              {displayedProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onQuickView={(p) => setSelectedQuickView(p)}
-                />
+              {displayedProducts.map((product, i) => (
+                <Reveal key={product.id} delay={(i % 3) * 90} variant="fade">
+                  <ProductCard
+                    product={product}
+                    onQuickView={(p) => setSelectedQuickView(p)}
+                  />
+                </Reveal>
               ))}
             </div>
           )}

@@ -40,7 +40,7 @@ export default function SearchModal({ isOpen, onClose }) {
       <div className="w-full max-w-2xl bg-card border border-gold/30 rounded-2xl p-6 shadow-2xl space-y-6 relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-ivory/60 hover:text-gold transition-colors p-2"
+          className="absolute top-4 right-4 text-ivory/60 hover:text-ivory transition-colors p-2"
         >
           <X className="w-6 h-6" />
         </button>
@@ -74,8 +74,8 @@ export default function SearchModal({ isOpen, onClose }) {
         {/* Results */}
         <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
           {loading && (
-            <div className="py-8 text-center text-gold text-sm animate-pulse flex items-center justify-center gap-2">
-              Searching
+            <div className="py-8 text-center text-muted text-sm flex items-center justify-center gap-2">
+              Searching…
             </div>
           )}
 
@@ -96,7 +96,7 @@ export default function SearchModal({ isOpen, onClose }) {
                 className="w-14 h-14 object-cover rounded-lg border border-gold/20"
               />
               <div className="flex-1">
-                <h4 className="font-sans font-bold text-base text-ivory group-hover:text-gold transition-colors">
+                <h4 className="font-sans font-bold text-base text-ivory group-hover:text-muted transition-colors">
                   {product.title}
                 </h4>
                 <p className="text-xs text-muted truncate max-w-sm font-light">{product.subtitle}</p>

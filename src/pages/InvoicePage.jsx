@@ -89,7 +89,7 @@ export default function InvoicePage() {
 
       {/* Printable area */}
       <div className="print-area max-w-4xl mx-auto px-4 py-8">
-        {error && <p className="text-center text-sm text-red-500 py-20">{error}</p>}
+        {error && <p className="text-center text-sm text-ivory py-20">{error}</p>}
         {!error && !orders && <p className="text-center text-sm text-muted py-20">Loading invoice…</p>}
         {!error && orders && orders.length === 0 && (
           <p className="text-center text-sm text-muted py-20">No orders yet.</p>

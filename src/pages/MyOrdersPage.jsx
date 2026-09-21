@@ -48,23 +48,23 @@ export default function MyOrdersPage() {
             <p className="text-xs text-muted font-num">{user?.email}</p>
           </div>
         </div>
-        <span className="px-3 py-1 bg-gold/20 text-gold text-xs font-bold uppercase rounded-full border border-gold/30">
-          Member Account
+        <span className="px-3 py-1 border border-ivory/30 text-muted text-xs font-bold uppercase rounded-full">
+          Account
         </span>
       </div>
 
       <div className="space-y-4">
         <h2 className="font-sans text-xl font-bold text-ivory flex items-center gap-2">
-          <Package className="w-5 h-5 text-gold" /> Order Vault & History ({orders.length})
+          <Package className="w-5 h-5 text-ivory" /> Order history ({orders.length})
         </h2>
 
         {loading ? (
-          <div className="py-16 text-center text-gold text-sm animate-pulse">Loading Orders...</div>
+          <div className="py-16 text-center text-muted text-sm">Loading…</div>
         ) : orders.length === 0 ? (
           <div className="text-center py-16 bg-card border border-gold/20 rounded-2xl space-y-3">
             <p className="text-sm text-muted">You have not placed any orders yet.</p>
             <Link to="/shop" className="btn-gold inline-block px-6 py-2.5 rounded text-xs uppercase font-bold">
-              Discover Fragrances
+              Browse Fragrances
             </Link>
           </div>
         ) : (
@@ -80,7 +80,7 @@ export default function MyOrdersPage() {
                     <span className="text-xs text-muted flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" /> {new Date(ord.created_at).toLocaleDateString()}
                     </span>
-                    <span className="px-3 py-1 bg-gold/20 text-gold text-xs font-bold rounded-full uppercase">
+                    <span className="px-3 py-1 border border-ivory/30 text-ivory text-xs font-bold rounded-full uppercase">
                       {ord.order_status}
                     </span>
                   </div>
@@ -108,7 +108,7 @@ export default function MyOrdersPage() {
                     to={`/track-order?query=${ord.order_number}`}
                     className="btn-outline-gold px-4 py-2 rounded text-xs font-bold uppercase flex items-center gap-1"
                   >
-                    <Truck className="w-3.5 h-3.5" /> Track Live Delivery <ArrowRight className="w-3.5 h-3.5" />
+                    <Truck className="w-3.5 h-3.5" />                    Track order <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </div>

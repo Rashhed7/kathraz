@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Mail, Shield, ArrowRight } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -52,36 +52,36 @@ export default function LoginPage() {
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-2">
         <img src="/images/logo.png" alt="Logo" className="h-16 w-auto mx-auto object-contain drop-shadow-lg" />
-        <h1 className="font-sans text-2xl font-bold text-ivory">KATHRAZ Client Login</h1>
-        <p className="text-xs text-muted font-light">Access your order history and private membership</p>
+        <h1 className="font-sans text-2xl font-bold text-ivory">Sign in</h1>
+        <p className="text-xs text-muted font-light">Access your orders and account details</p>
       </div>
 
       <div className="bg-card border border-gold/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 glass-panel">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-400 rounded text-xs text-red-700">
+          <div className="p-3 bg-charcoal border border-ivory/40 rounded text-xs text-ivory">
             {error}
           </div>
         )}
 
         {/* Demo Fast Login Bar */}
         <div className="p-3 rounded-xl bg-gold/10 border border-gold/30 space-y-2 text-xs">
-          <span className="text-gold font-bold flex items-center gap-1 uppercase tracking-wider text-[11px]">
-            Demo Credentials Quick-Fill
+          <span className="text-ivory font-bold flex items-center gap-1 uppercase tracking-wider text-[11px]">
+            Quick demo login
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={fillDemoAdmin}
-              className="py-1.5 px-2 bg-card hover:bg-gold hover:text-charcoal border border-gold/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
+              className="py-1.5 px-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
             >
-              ⚡ Demo Admin
+              Demo admin
             </button>
             <button
               type="button"
               onClick={fillDemoCustomer}
-              className="py-1.5 px-2 bg-card hover:bg-gold hover:text-charcoal border border-gold/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
+              className="py-1.5 px-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
             >
-              ⚡ Demo Customer
+              Demo customer
             </button>
           </div>
         </div>
@@ -120,14 +120,14 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full btn-gold py-3.5 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
           >
-            {submitting ? 'Authenticating...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
         <div className="text-center text-xs text-muted border-t border-gold/15 pt-4">
-          Don't have an account yet?{' '}
+          Don't have an account?{' '}
           <Link to="/register" className="text-gold font-bold hover:underline">
-            Register Here
+            Register
           </Link>
         </div>
       </div>

@@ -22,7 +22,7 @@ export default function QuickViewModal({ product, onClose }) {
       <div className="w-full max-w-3xl bg-card border border-gold/30 rounded-2xl overflow-hidden shadow-2xl relative grid grid-cols-1 md:grid-cols-2">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 text-ivory/60 hover:text-gold transition-colors p-2 bg-obsidian/60 rounded-full"
+          className="absolute top-4 right-4 z-20 text-ivory/60 hover:text-ivory transition-colors p-2 bg-obsidian/60 rounded-full"
         >
           <X className="w-5 h-5" />
         </button>
@@ -71,7 +71,7 @@ export default function QuickViewModal({ product, onClose }) {
               {product.description}
             </p>
 
-            {/* Olfactory Notes Snapshot */}
+            {/* Notes snapshot */}
             <div className="mt-4 p-3 rounded-lg bg-obsidian border border-gold/15 text-xs space-y-1">
               <div><strong className="text-gold">Top:</strong> {product.top_notes}</div>
               <div><strong className="text-gold">Heart:</strong> {product.heart_notes}</div>
@@ -128,7 +128,7 @@ export default function QuickViewModal({ product, onClose }) {
               onClick={onClose}
               className="block text-center text-xs text-gold/80 hover:text-gold underline font-light"
             >
-              View Full Olfactory Profile & Customer Reviews →
+              View full details & reviews →
             </Link>
           </div>
         </div>

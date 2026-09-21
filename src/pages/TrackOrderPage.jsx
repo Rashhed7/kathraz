@@ -53,9 +53,9 @@ export default function TrackOrderPage() {
         <span className="text-xs uppercase tracking-widest text-gold font-semibold flex items-center justify-center gap-1">
           <Truck className="w-4 h-4" /> Courier
         </span>
-        <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">Live Order Tracking</h1>
+        <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">Track your order</h1>
         <p className="text-xs text-muted font-light max-w-md mx-auto">
-          Enter your KATHRAZ Order Number (e.g. KTZ-89210), Tracking Code, or Email address to inspect real-time courier progress.
+          Enter your order number, tracking code, or the email address you ordered with.
         </p>
       </div>
 
@@ -83,12 +83,12 @@ export default function TrackOrderPage() {
           disabled={loading}
           className="btn-gold px-6 py-3.5 rounded-xl text-xs uppercase font-bold tracking-wider flex items-center gap-1 shadow-lg disabled:opacity-50"
         >
-          {loading ? 'Searching...' : 'Track'}
+          {loading ? 'Searching…' : 'Track'}
         </button>
       </form>
 
       {error && (
-        <div className="max-w-xl mx-auto p-4 bg-red-50 border border-red-400 rounded-xl text-xs text-red-700 text-center">
+        <div className="max-w-xl mx-auto p-4 bg-charcoal border border-ivory/40 rounded-xl text-xs text-ivory text-center">
           {error}
         </div>
       )}
@@ -109,7 +109,7 @@ export default function TrackOrderPage() {
 
           {/* Visual Step Bar */}
           <div className="space-y-4">
-            <h3 className="text-xs text-gold uppercase tracking-wider font-semibold">Delivery Timeline Progression</h3>
+            <h3 className="text-xs text-muted uppercase tracking-wider font-semibold">Delivery progress</h3>
             <div className="relative flex items-center justify-between px-1 sm:px-4">
               <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-1 bg-gold/20 -z-0">
                 <div
@@ -151,7 +151,7 @@ export default function TrackOrderPage() {
             <div className="text-right sm:text-right">
               <strong className="text-gold block mb-1">Total Paid</strong>
               <span className="font-num text-xl font-bold text-gold">{formatPrice(order.total_amount)}</span>
-              <p className="text-[10px] text-emerald-400 font-num mt-1">Payment Status: {order.payment_status}</p>
+              <p className="text-[10px] text-muted font-num mt-1">Payment status: {order.payment_status}</p>
             </div>
           </div>
         </div>

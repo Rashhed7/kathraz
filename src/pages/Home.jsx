@@ -4,6 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import QuickViewModal from '../components/QuickViewModal';
 import ScentFinder from '../components/ScentFinder';
+import InstagramFeed from '../components/InstagramFeed';
+import Reveal from '../components/Reveal';
 import { useCart } from '../context/CartContext';
 
 export default function Home({ onOpenSearch }) {
@@ -13,6 +15,34 @@ export default function Home({ onOpenSearch }) {
   const [activeNoteTab, setActiveNoteTab] = useState('top');
   const [loading, setLoading] = useState(true);
   const heroVideoRef = useRef(null);
+  const heroSectionRef = useRef(null);
+
+  // Hero parallax: the video layer drifts at ~40% of scroll speed, creating
+  // depth behind the static text. rAF-throttled; transform is GPU-composited.
+  useEffect(() => {
+    const el = heroSectionRef.current;
+    if (!el) return undefined;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return undefined;
+
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = el.getBoundingClientRect().top;
+        if (y < 0 && y > -el.offsetHeight) {
+          const media = el.querySelector('.parallax');
+          if (media) media.style.transform = `translate3d(0, ${y * 0.4}px, 0)`;
+        }
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // Mobile autoplay fix: React doesn't reliably render the `muted` attribute,
   // and iOS Safari only allows autoplay when that attribute is on the DOM node.
@@ -56,9 +86,10 @@ export default function Home({ onOpenSearch }) {
     <div className="pb-24">
 
       {/* HERO — cover video background with text overlay */}
-      <section className="relative overflow-hidden">
-        {/* Video layer (hidden until the file exists — graceful gradient fallback) */}
-        <div className="absolute inset-0" aria-hidden="true">
+      <section ref={heroSectionRef} className="relative overflow-hidden">
+        {/* Video layer (hidden until the file exists — graceful gradient fallback).
+            No overlays — the video renders at full visibility. */}
+        <div className="parallax absolute inset-0" aria-hidden="true">
           <video
             ref={heroVideoRef}
             className="w-full h-full object-cover"
@@ -70,36 +101,40 @@ export default function Home({ onOpenSearch }) {
             preload="auto"
             onError={(e) => e.currentTarget.classList.add('hidden')}
           />
-          {/* Legibility overlays: light wash + top/bottom fade into the page */}
-          <div className="absolute inset-0 bg-obsidian/70" />
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-obsidian to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-obsidian to-transparent" />
         </div>
 
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
-          <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-6">
-            Crafted in India · Est. 2026
-          </p>
-          <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
-            Fine fragrances, thoughtfully made.
-          </h1>
-          <p className="mt-6 text-sm sm:text-[15px] text-ivory/80 font-light leading-relaxed max-w-xl mx-auto">
-            We create inspired interpretations of the world's most celebrated
-            perfumes, alongside original blends built on aged oud, Indian rose
-            absolutes and a 35% extrait concentration — made in small batches
-            and delivered across India.
-          </p>
-          <div className="mt-9 flex justify-center">
-            <Link
-              to="/shop"
-              className="btn-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
-            >
-              Shop the Collection
-            </Link>
-          </div>
-          <p className="mt-8 text-xs text-muted">
-            Ships across India in 2–4 days · Free above ₹5,000
-          </p>
+          <Reveal>
+            <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-6">
+              Crafted in India · Est. 2026
+            </p>
+          </Reveal>
+          <Reveal delay={120}>
+            <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-medium text-ivory leading-[1.08]">
+              Fine fragrances, thoughtfully made.
+            </h1>
+          </Reveal>
+          <Reveal delay={240}>
+            <p className="mt-6 text-sm sm:text-[15px] text-ivory/80 font-light leading-relaxed max-w-xl mx-auto">
+              We create inspired interpretations of the world's most celebrated
+              perfumes, alongside original blends built on aged oud, Indian rose
+              absolutes and a 35% extrait concentration — made in small batches
+              and delivered across India.
+            </p>
+          </Reveal>
+          <Reveal delay={360}>
+            <div className="mt-9 flex justify-center">
+              <Link
+                to="/shop"
+                className="btn-gold px-8 py-3.5 text-xs uppercase tracking-[0.15em]"
+              >
+                Shop the Collection
+              </Link>
+            </div>
+            <p className="mt-8 text-xs text-muted">
+              Delivered across India in 2–4 days
+            </p>
+          </Reveal>
         </div>
       </section>
 
@@ -107,31 +142,35 @@ export default function Home({ onOpenSearch }) {
       <section className="border-y border-ivory/10 bg-charcoal/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-3">The Collection</p>
-              <h2 className="font-sans text-3xl font-medium text-ivory">Personal Fragrances</h2>
-            <p className="mt-4 text-sm text-ivory/70 font-light leading-relaxed max-w-md">
-              Inspired interpretations of celebrated perfumes and original
-              blends — extraits and attar oils for daily wear, in unisex
-              compositions.
-            </p>
-              <Link
-                to="/shop?category=personal-fragrances"
-                className="mt-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-gold hover:text-gold-light transition-colors"
-              >
-                Browse all fragrances <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+            <Reveal variant="left">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.25em] text-muted mb-3">The Collection</p>
+                <h2 className="font-sans text-3xl font-medium text-ivory">Personal Fragrances</h2>
+                <p className="mt-4 text-sm text-ivory/70 font-light leading-relaxed max-w-md">
+                  Inspired interpretations of celebrated perfumes and original
+                  blends — extraits and attar oils for daily wear, in unisex
+                  compositions.
+                </p>
+                <Link
+                  to="/shop?category=personal-fragrances"
+                  className="mt-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-ivory hover:text-muted transition-colors underline underline-offset-4"
+                >
+                  Browse all fragrances <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </Reveal>
             <div className="grid grid-cols-3 gap-6 md:pl-10">
               {[
-                ['35%', 'extrait concentration'],
-                ['12+', 'hours on skin'],
-                ['2–4', 'day delivery, all India'],
-              ].map(([num, label]) => (
-                <div key={label}>
-                  <p className="font-num text-2xl font-medium text-ivory">{num}</p>
-                  <p className="text-[11px] text-muted mt-1 leading-snug">{label}</p>
-                </div>
+                ['Extrait', 'de parfum strength'],
+                ['2–4', 'day delivery in India'],
+                ['COD', 'available nationwide'],
+              ].map(([num, label], i) => (
+                <Reveal key={label} delay={i * 120}>
+                  <div>
+                    <p className="font-num text-2xl font-medium text-ivory">{num}</p>
+                    <p className="text-[11px] text-muted mt-1 leading-snug">{label}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -162,12 +201,13 @@ export default function Home({ onOpenSearch }) {
           <div className="py-20 text-center text-muted text-sm">Loading…</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bestsellerProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onQuickView={(p) => setSelectedQuickView(p)}
-              />
+            {bestsellerProducts.map((product, i) => (
+              <Reveal key={product.id} delay={(i % 3) * 110}>
+                <ProductCard
+                  product={product}
+                  onQuickView={(p) => setSelectedQuickView(p)}
+                />
+              </Reveal>
             ))}
           </div>
         )}
@@ -196,7 +236,7 @@ export default function Home({ onOpenSearch }) {
                   onClick={() => setActiveNoteTab(key)}
                   className={`w-full text-left px-4 py-3 flex items-baseline justify-between border-l-2 transition-colors ${
                     activeNoteTab === key
-                      ? 'border-gold text-ivory'
+                      ? 'border-ivory text-ivory'
                       : 'border-ivory/10 text-muted hover:text-ivory'
                   }`}
                 >
@@ -247,9 +287,11 @@ export default function Home({ onOpenSearch }) {
 
       {/* REVIEWS — restrained, plausible */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <div className="border-b border-ivory/10 pb-5 mb-10">
-          <h2 className="font-sans text-3xl font-medium text-ivory">From our customers</h2>
-        </div>
+        <Reveal>
+          <div className="border-b border-ivory/10 pb-5 mb-10">
+            <h2 className="font-sans text-3xl font-medium text-ivory">From our customers</h2>
+          </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
@@ -268,19 +310,24 @@ export default function Home({ onOpenSearch }) {
               name: 'Sana P.',
               meta: 'Saffron Imperial · Verified buyer',
             },
-          ].map((r) => (
-            <div key={r.name} className="flex flex-col">
-              <p className="text-sm text-ivory/80 font-light leading-relaxed italic flex-1">
-                "{r.text}"
-              </p>
-              <div className="mt-5 pt-4 border-t border-ivory/10">
-                <p className="text-sm text-ivory">{r.name}</p>
-                <p className="text-[11px] text-muted mt-0.5">{r.meta}</p>
+          ].map((r, i) => (
+            <Reveal key={r.name} delay={i * 140}>
+              <div className="flex flex-col">
+                <p className="text-sm text-ivory/80 font-light leading-relaxed italic flex-1">
+                  "{r.text}"
+                </p>
+                <div className="mt-5 pt-4 border-t border-ivory/10">
+                  <p className="text-sm text-ivory">{r.name}</p>
+                  <p className="text-[11px] text-muted mt-0.5">{r.meta}</p>
+                </div>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
+
+      {/* INSTAGRAM FEED — admin-managed posts */}
+      <InstagramFeed />
 
       {/* Quick View Modal */}
       {selectedQuickView && (

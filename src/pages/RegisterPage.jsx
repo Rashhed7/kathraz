@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Phone, MapPin, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Phone, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterPage() {
@@ -32,13 +32,13 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-4 py-12 space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="font-sans text-2xl font-bold text-ivory">Join KATHRAZ Membership</h1>
-        <p className="text-xs text-muted font-light">Create a private account for order tracking & bespoke sampling</p>
+        <h1 className="font-sans text-2xl font-bold text-ivory">Create account</h1>
+        <p className="text-xs text-muted font-light">For faster checkout and order tracking</p>
       </div>
 
       <div className="bg-card border border-gold/20 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 glass-panel">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-400 rounded text-xs text-red-700">
+          <div className="p-3 bg-charcoal border border-ivory/40 rounded text-xs text-ivory">
             {error}
           </div>
         )}
@@ -102,14 +102,14 @@ export default function RegisterPage() {
             disabled={submitting}
             className="w-full btn-gold py-3.5 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
           >
-            {submitting ? 'Creating Account...' : 'Register Account'} <ArrowRight className="w-4 h-4" />
+            {submitting ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
         <div className="text-center text-xs text-muted border-t border-gold/15 pt-4">
-          Already registered?{' '}
-          <Link to="/login" className="text-gold font-bold hover:underline">
-            Sign In Here
+          Already have an account?{' '}
+          <Link to="/login" className="text-ivory font-bold hover:underline">
+            Sign in
           </Link>
         </div>
       </div>

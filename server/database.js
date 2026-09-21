@@ -236,6 +236,23 @@ async function initDatabase() {
     )
   `);
 
+  // Instagram-style feed posts shown on the Home page (managed by admin)
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS instagram_posts (
+      id SERIAL PRIMARY KEY,
+      image_url TEXT NOT NULL,
+      caption TEXT,
+      link_url TEXT,
+      media_type TEXT DEFAULT 'image',
+      position INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  // Older installs: add the media_type column if it is missing
+  await runQuery(`
+    ALTER TABLE instagram_posts ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'image'
+  `);
+
   await seedInitialData();
 }
 

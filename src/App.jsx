@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -10,6 +10,18 @@ import CartDrawer from './components/CartDrawer';
 import SearchModal from './components/SearchModal';
 import ContactButtons from './components/ContactButtons';
 import Preloader from './components/Preloader';
+
+// Page transition: fades each route in on navigation. Keyed by pathname so
+// React remounts the wrapper per route, replaying the animation.
+function PageTransition({ children }) {
+  const { pathname } = useLocation();
+
+  return (
+    <div key={pathname} className="animate-pageIn">
+      {children}
+    </div>
+  );
+}
 
 import Home from './pages/Home';
 import Shop from './pages/Shop';
@@ -39,23 +51,25 @@ export default function App() {
               <Navbar onOpenSearch={() => setIsSearchOpen(true)} />
 
               <main className="flex-1">
-                <Routes>
-                  <Route path="/" element={<Home onOpenSearch={() => setIsSearchOpen(true)} />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/product/:slug" element={<ProductDetail />} />
-                  <Route path="/cart" element={<CartPage />} />
-                  <Route path="/checkout" element={<CheckoutPage />} />
-                  <Route path="/order-confirmation" element={<OrderConfirmation />} />
-                  <Route path="/track-order" element={<TrackOrderPage />} />
-                  <Route path="/invoice-all" element={<InvoicePage />} />
-                  <Route path="/invoice/:orderNumber" element={<InvoicePage />} />
-                  <Route path="/my-orders" element={<MyOrdersPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/contact" element={<ContactPage />} />
-                  <Route path="/faq" element={<FaqPage />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
-                </Routes>
+                <PageTransition>
+                  <Routes>
+                    <Route path="/" element={<Home onOpenSearch={() => setIsSearchOpen(true)} />} />
+                    <Route path="/shop" element={<Shop />} />
+                    <Route path="/product/:slug" element={<ProductDetail />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                    <Route path="/track-order" element={<TrackOrderPage />} />
+                    <Route path="/invoice-all" element={<InvoicePage />} />
+                    <Route path="/invoice/:orderNumber" element={<InvoicePage />} />
+                    <Route path="/my-orders" element={<MyOrdersPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/contact" element={<ContactPage />} />
+                    <Route path="/faq" element={<FaqPage />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                  </Routes>
+                </PageTransition>
               </main>
 
               <Footer />

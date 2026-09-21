@@ -216,7 +216,7 @@ export default function CheckoutPage() {
           email: customerEmail,
           contact: phone
         },
-        theme: { color: '#9C7A3C' },
+        theme: { color: '#000000' },
         handler: async (response) => {
           try {
             const verifyRes = await fetch('/api/orders/verify', {
@@ -276,7 +276,7 @@ export default function CheckoutPage() {
           )}
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-400 text-xs text-red-700 rounded">
+            <div className="p-3 bg-charcoal border border-ivory/40 text-xs text-ivory rounded">
               {error}
             </div>
           )}
@@ -343,7 +343,7 @@ export default function CheckoutPage() {
               >
                 <div className="font-bold text-xs flex items-center justify-between">
                   <span>Razorpay (UPI / Cards / NetBanking)</span>
-                  <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-num">INSTANT</span>
+                  <span className="text-[10px] bg-ivory text-obsidian px-2 py-0.5 rounded font-num">INSTANT</span>
                 </div>
                 <p className="text-[11px] text-muted mt-1 font-light">Secure payment via GPay, PhonePe, Cards & Bank</p>
               </button>
@@ -401,7 +401,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  className="text-xs underline text-red-400 hover:text-red-300"
+                  className="text-xs underline text-ivory hover:text-muted"
                 >
                   Remove
                 </button>
@@ -426,7 +426,7 @@ export default function CheckoutPage() {
                 </button>
               </div>
             )}
-            {couponError && <p className="text-[11px] text-red-400">{couponError}</p>}
+            {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}
             {couponSuccess && <p className="text-[11px] text-gold">{couponSuccess}</p>}
           </div>
 

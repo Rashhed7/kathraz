@@ -51,7 +51,7 @@ export default function CartPage() {
         <h2 className="font-sans text-2xl font-bold text-ivory">Your Fragrance Bag is Empty</h2>
         <p className="text-xs text-muted">Discover our collection of Extrait de Parfums and home atmospheres.</p>
         <Link to="/shop" className="btn-gold inline-block px-8 py-3 rounded-lg text-xs uppercase font-bold tracking-wider">
-          Explore Treasury
+          Explore Fragrances
         </Link>
       </div>
     );
@@ -86,14 +86,14 @@ export default function CartPage() {
                 <div className="flex items-center border border-gold/20 rounded bg-card text-xs">
                   <button
                     onClick={() => updateQuantity(item.variant_id, item.quantity - 1)}
-                    className="px-3 py-1.5 text-ivory hover:text-gold"
+                    className="px-3 py-1.5 text-ivory hover:text-muted"
                   >
                     <Minus className="w-3 h-3" />
                   </button>
                   <span className="px-3 font-semibold text-ivory">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.variant_id, item.quantity + 1)}
-                    className="px-3 py-1.5 text-ivory hover:text-gold"
+                    className="px-3 py-1.5 text-ivory hover:text-muted"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -105,7 +105,7 @@ export default function CartPage() {
 
                 <button
                   onClick={() => removeFromCart(item.variant_id)}
-                  className="text-muted hover:text-red-400 p-1"
+                  className="text-muted hover:text-ivory p-1"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -125,7 +125,7 @@ export default function CartPage() {
                 <span className="flex items-center gap-1 font-semibold">
                   <Tag className="w-3.5 h-3.5" /> {appliedCoupon.code} Applied
                 </span>
-                <button onClick={() => setAppliedCoupon(null)} className="text-red-400 underline">Remove</button>
+                <button onClick={() => setAppliedCoupon(null)} className="text-ivory underline">Remove</button>
               </div>
             ) : (
               <form onSubmit={handleApplyCoupon} className="flex gap-2">
@@ -139,7 +139,7 @@ export default function CartPage() {
                 <button type="submit" className="btn-outline-gold px-4 text-xs font-bold uppercase rounded">Apply</button>
               </form>
             )}
-            {couponError && <p className="text-[11px] text-red-400">{couponError}</p>}
+            {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}
           </div>
 
           <div className="space-y-2 text-xs text-muted border-t border-gold/10 pt-4">

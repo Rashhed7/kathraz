@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PHONE_DISPLAY, EMAIL_ADDRESS } from '../config/contact';
+import Reveal from './Reveal';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -16,7 +17,8 @@ export default function Footer() {
 
   return (
     <footer className="bg-obsidian border-t border-ivory/10 pt-14 pb-10 text-ivory/70">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Reveal variant="fade">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           {/* Brand */}
           <div className="md:col-span-4 space-y-4">
@@ -25,9 +27,8 @@ export default function Footer() {
               <span className="font-cinzel text-xl font-semibold tracking-[0.3em] text-ivory">KATHRAZ</span>
             </div>
             <p className="text-xs text-muted leading-relaxed font-light max-w-xs">
-              A fragrance house blending India's attar distillation tradition
-              with French perfumery. Aged oud, rose absolutes, and
-              extrait-strength compositions in small batches.
+              Small-batch fragrances made in India — aged oud, rose
+              absolutes and extrait-strength compositions.
             </p>
             <p className="text-[11px] text-muted tracking-[0.2em] uppercase">
               Made in India
@@ -64,13 +65,12 @@ export default function Footer() {
           <div className="md:col-span-4 space-y-4">
             <h3 className="text-[11px] uppercase tracking-[0.2em] text-muted">Newsletter</h3>
             <p className="text-xs text-muted font-light leading-relaxed">
-              Batch releases and restocks, a few times a year. No more than
-              that — we don't write often.
+              Batch releases and restocks, a few times a year.
             </p>
 
             {subscribed ? (
               <p className="text-xs text-ivory border border-ivory/15 bg-charcoal/50 px-3 py-2.5">
-                Thank you — you're on the list.
+                You're on the list.
               </p>
             ) : (
               <form onSubmit={handleSubscribe} className="flex">
@@ -99,6 +99,7 @@ export default function Footer() {
           <p>We deliver across India · Questions? {PHONE_DISPLAY}</p>
         </div>
       </div>
+      </Reveal>
     </footer>
   );
 }

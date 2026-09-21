@@ -375,4 +375,66 @@ router.delete('/coupons/:id', async (req, res) => {
   }
 });
 
+// 6. Instagram Feed Posts (Home page gallery)
+router.get('/posts', async (req, res) => {
+  try {
+    const posts = await allQuery('SELECT * FROM instagram_posts ORDER BY position ASC, id DESC');
+    res.json({ posts });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
+router.post('/posts', async (req, res) => {
+  try {
+    const { image_url, caption, link_url, media_type } = req.body;
+    if (!image_url) {
+      return res.status(400).json({ error: 'A video or image is required' });
+    }
+    // New posts go to the front of the feed
+    const posRes = await getQuery('SELECT MIN(position) as minPos FROM instagram_posts');
+    const position = posRes && posRes.minPos != null ? posRes.minPos - 1 : 0;
+    const created = await runQuery(
+      'INSERT INTO instagram_posts (image_url, caption, link_url, media_type, position) VALUES (?, ?, ?, ?, ?)',
+      [image_url, caption || '', link_url || '', media_type === 'video' ? 'video' : 'image', position]
+    );
+    const post = await getQuery('SELECT * FROM instagram_posts WHERE id = ?', [created.lastID]);
+    res.status(201).json({ message: 'Post added', post });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add post' });
+  }
+});
+
+// Move a post one slot left/right in the feed
+router.put('/posts/:id/move', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { direction } = req.body; // 'up' | 'down'
+    const posts = await allQuery('SELECT id FROM instagram_posts ORDER BY position ASC, id DESC');
+    const idx = posts.findIndex((p) => p.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Post not found' });
+    const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= posts.length) {
+      return res.json({ message: 'Already at the edge' });
+    }
+    const a = posts[idx];
+    const b = posts[swapWith];
+    await runQuery('UPDATE instagram_posts SET position = ? WHERE id = ?', [swapWith, a.id]);
+    await runQuery('UPDATE instagram_posts SET position = ? WHERE id = ?', [idx, b.id]);
+    res.json({ message: 'Order updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to reorder posts' });
+  }
+});
+
+router.delete('/posts/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await runQuery('DELETE FROM instagram_posts WHERE id = ?', [id]);
+    res.json({ message: 'Post deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
 module.exports = router;

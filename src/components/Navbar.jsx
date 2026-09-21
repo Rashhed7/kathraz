@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, User, Menu, X, Globe, Shield } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -17,41 +17,45 @@ const ANNOUNCEMENTS = [
 export default function Navbar({ onOpenSearch }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { totalItemsCount, setIsCartOpen, currency, setCurrency } = useCart();
   const { wishlistCount } = useWishlist();
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
+  // Navbar elevation once the visitor scrolls. The announcement bar lives
+  // OUTSIDE the sticky header and scrolls away naturally, so toggling the
+  // shadow can never change page height (which would cause scroll jitter).
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 bg-obsidian/95 backdrop-blur-sm border-b border-ivory/10">
-      {/* Announcement Bar — scrolling greetings & offers, pauses on hover.
-          Black text to match the black logo separators. */}
-      <div className="marquee-hover sheen overflow-hidden bg-charcoal text-ivory text-[11px] py-2 tracking-[0.15em] uppercase border-b border-ivory/5">
-        <div className="animate-marquee flex w-max items-center">
-          {[0, 1].map((copy) => (
-            <div key={copy} className="flex items-center" aria-hidden={copy === 1}>
-              {ANNOUNCEMENTS.map((item, idx) => (
-                <span key={idx} className="flex items-center whitespace-nowrap">
-                  <span className="px-6">{item}</span>
-                  <img
-                    src="/images/logo.png"
-                    alt=""
-                    className="h-4 w-auto object-contain animate-sepPulse"
-                    style={{ animationDelay: `${(idx % 5) * 0.4}s` }}
-                  />
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
+    <>
+      {/* Announcement bar — scrolls away with the page (not sticky). */}
+      <div className="bg-ivory text-obsidian text-[11px] tracking-[0.15em] uppercase text-center">
+        <span className="block py-2 px-4">
+          {ANNOUNCEMENTS[new Date().getDate() % ANNOUNCEMENTS.length]}
+        </span>
       </div>
+
+      <header
+        className={`sticky top-0 z-40 bg-obsidian border-b transition-[box-shadow,border-color] duration-300 ${
+          scrolled
+            ? 'border-ivory/10 shadow-[0_1px_0_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.18)]'
+            : 'border-transparent'
+        }`}
+      >
 
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Mobile Menu Button */}
         <div className="lg:hidden flex items-center shrink-0">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-ivory hover:text-gold p-2 transition-colors"
+            className="text-ivory hover:text-muted p-2 transition-colors"
             aria-label="Toggle Navigation"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -130,7 +134,7 @@ export default function Navbar({ onOpenSearch }) {
           {/* Cart */}
           <button
             onClick={() => setIsCartOpen(true)}
-            className="p-2 text-ivory hover:text-gold transition-colors relative"
+            className="p-2 text-ivory transition-colors relative"
             title="Bag"
           >
             <ShoppingBag className="w-5 h-5" />
@@ -223,21 +227,21 @@ export default function Navbar({ onOpenSearch }) {
       {/* Mobile Drawer Navigation */}
       {isMobileMenuOpen && (
         <div className="lg:hidden bg-obsidian border-b border-ivory/10 px-6 py-6 space-y-1 text-sm animate-fadeIn">
-          <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Home</Link>
-          <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Shop All</Link>
-          <Link to="/shop?category=personal-fragrances" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Extrait de Parfum</Link>
-          <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">FAQ & Support</Link>
-          <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Track an Order</Link>
-          <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">
+          <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Home</Link>
+          <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Shop All</Link>
+          <Link to="/shop?category=personal-fragrances" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Extrait de Parfum</Link>
+          <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">FAQ & Support</Link>
+          <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Track an Order</Link>
+          <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">
             My Wishlist{wishlistCount > 0 ? ` (${wishlistCount})` : ''}
           </Link>
           <div className="border-t border-ivory/10 my-2" />
           {user ? (
             <>
               <div className="py-1 text-xs text-muted">{user.name}</div>
-              <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">My Orders</Link>
+              <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">My Orders</Link>
               {isAdmin && (
-                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Admin</Link>
+                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Admin</Link>
               )}
               <button
                 onClick={() => {
@@ -252,12 +256,13 @@ export default function Navbar({ onOpenSearch }) {
             </>
           ) : (
             <>
-              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Sign In</Link>
-              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-gold">Create Account</Link>
+              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Sign In</Link>
+              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Create Account</Link>
             </>
           )}
         </div>
       )}
-    </header>
+      </header>
+    </>
   );
 }

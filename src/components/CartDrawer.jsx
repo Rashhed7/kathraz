@@ -68,7 +68,7 @@ export default function CartDrawer() {
             </div>
             <button
               onClick={() => setIsCartOpen(false)}
-              className="p-2 text-ivory/70 hover:text-gold transition-colors"
+              className="p-2 text-ivory/70 hover:text-ivory transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -130,7 +130,7 @@ export default function CartDrawer() {
                         <h4 className="font-sans font-bold text-sm text-ivory leading-tight">{item.title}</h4>
                         <button
                           onClick={() => removeFromCart(item.variant_id)}
-                          className="text-muted hover:text-red-400 p-1 transition-colors"
+                          className="text-muted hover:text-ivory p-1 transition-colors"
                           title="Remove item"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -143,14 +143,14 @@ export default function CartDrawer() {
                       <div className="flex items-center border border-gold/20 rounded bg-card text-xs">
                         <button
                           onClick={() => updateQuantity(item.variant_id, item.quantity - 1)}
-                          className="px-2 py-1 text-ivory hover:text-gold transition-colors"
+                          className="px-2 py-1 text-ivory hover:text-muted transition-colors"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="px-2 font-semibold text-ivory">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.variant_id, item.quantity + 1)}
-                          className="px-2 py-1 text-ivory hover:text-gold transition-colors"
+                          className="px-2 py-1 text-ivory hover:text-muted transition-colors"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -177,7 +177,7 @@ export default function CartDrawer() {
                     </span>
                     <button
                       onClick={() => setAppliedCoupon(null)}
-                      className="text-xs underline text-red-400 hover:text-red-300"
+                      className="text-xs underline text-ivory hover:text-muted"
                     >
                       Remove
                     </button>
@@ -199,7 +199,7 @@ export default function CartDrawer() {
                     </button>
                   </form>
                 )}
-                {couponError && <p className="text-[11px] text-red-400">{couponError}</p>}
+                {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}
                 {couponSuccess && <p className="text-[11px] text-gold">{couponSuccess}</p>}
 
                 <button
