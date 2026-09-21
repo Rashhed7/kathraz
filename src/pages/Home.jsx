@@ -139,9 +139,6 @@ export default function Home({ onOpenSearch }) {
         </div>
       </section>
 
-      {/* AD SPOTLIGHT — admin-managed promo banners */}
-      <AdBanner />
-
       {/* CATEGORY — single honest band */}
       <section className="border-y border-ivory/10 bg-charcoal/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -216,6 +213,11 @@ export default function Home({ onOpenSearch }) {
           </div>
         )}
       </section>
+
+      {/* AD SPOTLIGHT — admin-managed promo banners, between products and notes */}
+      <div className="pt-24">
+        <AdBanner />
+      </div>
 
       {/* NOTES — quiet explainer */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
