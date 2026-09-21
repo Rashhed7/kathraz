@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -84,6 +85,17 @@ export default function LoginPage() {
               Demo customer
             </button>
           </div>
+        </div>
+
+        {/* Google sign-in */}
+        <div>
+          <GoogleLoginButton onError={(msg) => setError(msg)} />
+        </div>
+
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted">
+          <span className="flex-1 h-px bg-ivory/10" />
+          or use email
+          <span className="flex-1 h-px bg-ivory/10" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">

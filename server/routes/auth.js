@@ -1,10 +1,15 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const { getQuery, runQuery, allQuery } = require('../database');
 const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Google Sign-In client — verifies ID tokens issued by Google Identity Services.
+// GOOGLE_CLIENT_ID must match the one the frontend button uses.
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Register Customer
 router.post('/register', async (req, res) => {
@@ -76,6 +81,65 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });
+  }
+});
+
+// Google Sign-In — the frontend sends the credential (ID token) from the
+// Google button; we verify it with Google, then upsert a local user and
+// issue our standard JWT so the rest of the app works unchanged.
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential is required' });
+    }
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Google sign-in is not configured' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const profile = ticket.getPayload();
+    if (!profile || !profile.email) {
+      return res.status(400).json({ error: 'Could not read the Google account' });
+    }
+
+    const email = profile.email.toLowerCase().trim();
+    let user = await getQuery('SELECT * FROM users WHERE email = ?', [email]);
+
+    if (!user) {
+      // Random password hash — the account is OAuth-only unless reset
+      const randomHash = await bcrypt.hash(jwt.sign({ sub: profile.sub }, JWT_SECRET), 10);
+      const result = await runQuery(
+        `INSERT INTO users (name, email, password_hash, role, phone, address) VALUES (?, ?, ?, 'customer', ?, ?)`,
+        [profile.name || email.split('@')[0], email, randomHash, '', '']
+      );
+      user = await getQuery('SELECT * FROM users WHERE id = ?', [result.lastID]);
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: 'Logged in with Google',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        address: user.address
+      }
+    });
+  } catch (error) {
+    console.error('Google sign-in error:', error.message);
+    res.status(401).json({ error: 'Google sign-in failed. Please try again or use email sign-in.' });
   }
 });
 

@@ -73,8 +73,25 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Google Sign-In: exchange the GIS credential for our standard JWT
+  const loginWithGoogle = async (credential) => {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Google sign-in failed');
+    }
+    localStorage.setItem('kathraz_token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    return data.user;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, isAdmin: user?.role === 'admin' }}>
       {children}
     </AuthContext.Provider>
   );

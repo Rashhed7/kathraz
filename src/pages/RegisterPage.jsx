@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Phone, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -42,6 +43,17 @@ export default function RegisterPage() {
             {error}
           </div>
         )}
+
+        {/* Google sign-in — creates the account on first use */}
+        <div>
+          <GoogleLoginButton onError={(msg) => setError(msg)} />
+        </div>
+
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted">
+          <span className="flex-1 h-px bg-ivory/10" />
+          or register with email
+          <span className="flex-1 h-px bg-ivory/10" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
