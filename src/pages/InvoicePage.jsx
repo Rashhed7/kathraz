@@ -23,7 +23,7 @@ export default function InvoicePage() {
 
   useEffect(() => {
     if (isBulk && !isAdmin) {
-      navigate('/login?demo=admin');
+      navigate('/login');
       return;
     }
     fetchInvoices();

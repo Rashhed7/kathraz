@@ -1,8 +1,37 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { sendEmail, orderStatusEmail } = require('../utils/mailer');
 
 const router = express.Router();
+
+// Turn a product title into a URL-friendly slug, e.g.
+// "KATHRAZ Zahren Extrait" -> "kathraz-zahren-extrait".
+function slugify(title) {
+  return String(title)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+// Slugs are UNIQUE in the products table. If another product already owns the
+// requested slug, append -2, -3, ... until it's free (the admin's own row is
+// excluded via excludeId so re-saving the same product never renames it).
+async function findUniqueSlug(baseSlug, excludeId = null) {
+  if (!baseSlug) return baseSlug;
+  let candidate = baseSlug;
+  let suffix = 2;
+  while (true) {
+    const clash = excludeId == null
+      ? await getQuery('SELECT id FROM products WHERE slug = ?', [candidate])
+      : await getQuery('SELECT id FROM products WHERE slug = ? AND id != ?', [candidate, excludeId]);
+    if (!clash) return candidate;
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+}
 
 // Apply auth & admin middleware to all admin endpoints
 router.use(authenticateToken);
@@ -63,7 +92,10 @@ router.post('/products', async (req, res) => {
       return res.status(400).json({ error: 'Offer price must be lower than the original price' });
     }
 
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    // Slug: use the admin's custom slug when provided, otherwise derive it
+    // from the title. Either way, guarantee uniqueness.
+    const requestedSlug = typeof req.body.slug === 'string' ? slugify(req.body.slug) : '';
+    const slug = await findUniqueSlug(requestedSlug || slugify(title));
 
     const result = await runQuery(`
       INSERT INTO products (title, slug, subtitle, description, category_id, base_price, sale_price, is_featured, is_bestseller, gender, concentration, top_notes, heart_notes, base_notes, longevity, sillage, image_url, gallery_json)
@@ -165,6 +197,21 @@ router.put('/products/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    // Slug resolution on update, in order of intent:
+    //   1. Admin typed a custom slug in the editor  -> use it (uniquified).
+    //   2. Title changed, no custom slug            -> regenerate from title
+    //      so /product/<slug> never shows a stale name (the Zahren/reef bug).
+    //   3. Title unchanged, no custom slug          -> keep the existing slug
+    //      so already-published links keep working.
+    let finalSlug = existing.slug;
+    const requestedSlug = typeof req.body.slug === 'string' ? slugify(req.body.slug) : '';
+    const fromTitle = slugify(title);
+    if (requestedSlug) {
+      finalSlug = await findUniqueSlug(requestedSlug, id);
+    } else if (fromTitle && fromTitle !== existing.slug) {
+      finalSlug = await findUniqueSlug(fromTitle, id);
+    }
+
     // Gallery: array of image URLs. When the client doesn't send one, keep
     // the existing gallery untouched.
     let galleryJson = existing.gallery_json;
@@ -179,12 +226,12 @@ router.put('/products/:id', async (req, res) => {
 
     await runQuery(`
       UPDATE products SET
-        title = ?, subtitle = ?, description = ?, category_id = ?, base_price = ?, sale_price = ?,
+        title = ?, slug = ?, subtitle = ?, description = ?, category_id = ?, base_price = ?, sale_price = ?,
         gender = ?, concentration = ?, top_notes = ?, heart_notes = ?, base_notes = ?,
         longevity = ?, sillage = ?, image_url = ?, gallery_json = ?, is_featured = ?, is_bestseller = ?
       WHERE id = ?
     `, [
-      title, subtitle || '', description || '', category_id, basePrice, salePrice,
+      title, finalSlug, subtitle || '', description || '', category_id, basePrice, salePrice,
       gender || 'Unisex', concentration || 'Extrait de Parfum', top_notes || '', heart_notes || '', base_notes || '',
       longevity || '12+ Hours', sillage || 'Intense', image_url, galleryJson, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
     ]);
@@ -317,9 +364,27 @@ router.put('/orders/:id/status', async (req, res) => {
     await runQuery(sql, params);
 
     const updated = await getQuery('SELECT * FROM orders WHERE id = ?', [id]);
+
+    // Customer email on every status change (async, never blocks the admin UI).
+    // Skipped when nothing meaningful changed (e.g. only a re-save).
+    if (updated) {
+      const items = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [id]);
+      const { subject, html, text } = orderStatusEmail({
+        order: updated,
+        items,
+        newStatus: updated.order_status,
+        paymentStatus: updated.payment_status,
+        trackingNumber: tracking_number,
+        courierName: courier_name,
+      });
+      sendEmail({ to: updated.customer_email, subject, html, text }).catch((err) =>
+        console.error('[status-email] failed:', err.message)
+      );
+    }
+
     res.json({ message: `Order status updated to ${updated.order_status}`, order: updated });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update order status' });
+    res.status(500).json({ error: 'Failed to update order status' })
   }
 });
 
@@ -508,6 +573,158 @@ router.delete('/ads/:id', async (req, res) => {
     res.json({ message: 'Ad deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete ad' });
+  }
+});
+
+// 8. Admin Management — invite/manage fellow admins.
+// Guardrails: you can't demote/delete yourself, and you can't demote or delete
+// the LAST remaining admin — guarantees the store always keeps at least one.
+
+// List all admin users
+router.get('/admins', async (req, res) => {
+  try {
+    const admins = await allQuery(`
+      SELECT id, name, email, phone, role, created_at
+      FROM users
+      WHERE role = 'admin'
+      ORDER BY id ASC
+    `);
+    res.json({ admins });
+  } catch (error) {
+    console.error('List admins error:', error);
+    res.status(500).json({ error: 'Failed to fetch admins' });
+  }
+});
+
+// Create a new admin. If the email already belongs to an existing CUSTOMER
+// account, that account is PROMOTED to admin (name/phone/password updated to
+// the provided values). Only a true duplicate admin is rejected.
+router.post('/admins', async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Admin password must be at least 8 characters' });
+    }
+
+    const normalized = String(email).toLowerCase().trim();
+    const existing = await getQuery('SELECT id, name, role FROM users WHERE email = ?', [normalized]);
+
+    if (existing && existing.role === 'admin') {
+      return res.status(400).json({ error: 'That email is already an admin' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    if (existing) {
+      // Promote the existing customer to admin with the new credentials.
+      await runQuery(
+        'UPDATE users SET name = ?, password_hash = ?, phone = ?, role = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?',
+        [name.trim(), hashed, phone || '', 'admin', existing.id]
+      );
+      const admin = await getQuery('SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?', [existing.id]);
+      return res.status(201).json({ message: 'Existing account promoted to admin', admin });
+    }
+
+    const result = await runQuery(
+      `INSERT INTO users (name, email, password_hash, role, phone, address)
+       VALUES (?, ?, ?, 'admin', ?, '')`,
+      [name.trim(), normalized, hashed, phone || '']
+    );
+    const admin = await getQuery('SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?', [result.lastID]);
+    res.status(201).json({ message: 'Admin created', admin });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({ error: 'Failed to create admin' });
+  }
+});
+
+// Change an admin's role (currently: demote to 'customer')
+router.put('/admins/:id/role', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { role } = req.body;
+    if (!['admin', 'customer'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const target = await getQuery('SELECT id, name, role FROM users WHERE id = ?', [id]);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    if (target.role === 'admin') {
+      if (id === req.user.id) {
+        return res.status(400).json({ error: "You can't change your own role — ask another admin to do it" });
+      }
+      const adminCount = await getQuery("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+      if (parseInt(adminCount.count, 10) <= 1) {
+        return res.status(400).json({ error: 'Cannot demote the last remaining admin' });
+      }
+    }
+
+    await runQuery('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+    res.json({ message: `Role updated to ${role}` });
+  } catch (error) {
+    console.error('Change role error:', error);
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+// Reset an admin's password (also clears any pending password-reset token)
+router.put('/admins/:id/password', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { password } = req.body;
+    if (!password || String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const target = await getQuery('SELECT id, role FROM users WHERE id = ?', [id]);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role !== 'admin') {
+      return res.status(400).json({ error: 'This user is not an admin' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    await runQuery(
+      'UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?',
+      [hashed, id]
+    );
+    res.json({ message: 'Password reset' });
+  } catch (error) {
+    console.error('Admin password reset error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Delete an admin
+router.delete('/admins/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const target = await getQuery('SELECT id, name, role FROM users WHERE id = ?', [id]);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role !== 'admin') {
+      return res.status(400).json({ error: 'This user is not an admin' });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ error: "You can't delete your own account" });
+    }
+
+    const adminCount = await getQuery("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+    if (parseInt(adminCount.count, 10) <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last remaining admin' });
+    }
+
+    await runQuery('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'Admin removed' });
+  } catch (error) {
+    // FK constraint: admin has orders/wishlists attached
+    if (String(error.message).includes('FOREIGN KEY')) {
+      return res.status(400).json({ error: 'This admin has orders or wishlist items attached — demote to customer instead of deleting.' });
+    }
+    console.error('Delete admin error:', error);
+    res.status(500).json({ error: 'Failed to delete admin' });
   }
 });
 

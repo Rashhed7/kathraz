@@ -33,6 +33,7 @@ import TrackOrderPage from './pages/TrackOrderPage';
 import InvoicePage from './pages/InvoicePage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RegisterPage from './pages/RegisterPage';
 import ContactPage from './pages/ContactPage';
 import FaqPage from './pages/FaqPage';
@@ -64,6 +65,8 @@ export default function App() {
                     <Route path="/invoice/:orderNumber" element={<InvoicePage />} />
                     <Route path="/my-orders" element={<MyOrdersPage />} />
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ForgotPasswordPage />} />
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/contact" element={<ContactPage />} />
                     <Route path="/faq" element={<FaqPage />} />

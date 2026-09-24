@@ -2,6 +2,12 @@ const express = require('express');
 const crypto = require('crypto');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
+const { sendEmail, orderPlacedEmail, orderStatusEmail } = require('../utils/mailer');
+
+// Fire-and-forget customer email — never blocks or fails the order flow.
+function sendOrderEmail(promise) {
+  promise.catch((err) => console.error('[order-email] failed:', err.message));
+}
 
 const router = express.Router();
 
@@ -174,6 +180,10 @@ router.post('/', async (req, res) => {
     const createdOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [orderId]);
     const orderItems = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
 
+    // Order-placed email with itemized invoice summary (async, non-blocking)
+    const { subject, html, text } = orderPlacedEmail({ order: createdOrder, items: orderItems });
+    sendOrderEmail(sendEmail({ to: customer_email, subject, html, text }));
+
     res.status(201).json({
       message: 'Order created successfully',
       order: createdOrder,
@@ -232,6 +242,19 @@ router.post('/verify', async (req, res) => {
     );
 
     const updatedOrder = await getQuery('SELECT order_number FROM orders WHERE id = ?', [payment.order_id]);
+
+    // Payment received -> send confirmation email (async, non-blocking)
+    if (updatedOrder) {
+      const fullOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [payment.order_id]);
+      const items = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [payment.order_id]);
+      const { subject, html, text } = orderStatusEmail({
+        order: fullOrder,
+        items,
+        newStatus: 'Confirmed',
+        paymentStatus: 'Paid',
+      });
+      sendOrderEmail(sendEmail({ to: fullOrder.customer_email, subject, html, text }));
+    }
 
     res.json({
       verified: true,

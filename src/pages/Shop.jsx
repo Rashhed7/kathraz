@@ -99,16 +99,14 @@ export default function Shop() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
-      {/* Header Banner */}
-      <div className="relative rounded-2xl bg-card border border-gold/20 p-8 sm:p-12 overflow-hidden shadow-2xl glass-panel">
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <span className="text-xs uppercase tracking-[0.25em] text-muted font-semibold flex items-center gap-1">
-            KATHRAZ
-          </span>
-          <h1 className="font-sans text-3xl sm:text-4xl font-bold text-ivory">
+      {/* Header Banner — compact */}
+      <div className="relative rounded-2xl bg-card border border-gold/20 px-6 py-5 overflow-hidden glass-panel">
+        <div className="relative z-10 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="font-sans text-xl sm:text-2xl font-bold text-ivory">
             {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Collection' : 'All Fragrances'}
           </h1>
-          <p className="text-xs text-muted font-light leading-relaxed">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-muted font-semibold">KATHRAZ</span>
+          <p className="w-full text-xs text-muted font-light">
             Extrait de parfums and attar oils, blended and bottled in small batches.
           </p>
         </div>

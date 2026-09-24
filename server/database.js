@@ -1,4 +1,4 @@
-const { Pool, types } = require('pg');
+const { Pool, Client, types } = require('pg');
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 
@@ -7,18 +7,88 @@ const bcrypt = require('bcryptjs');
 types.setTypeParser(1700, (val) => parseFloat(val));
 types.setTypeParser(20, (val) => parseInt(val, 10));
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error(
-    'DATABASE_URL is not set. Add it to your .env file (Supabase Dashboard -> Project Settings -> Database -> Connection string).'
-  );
+// Two execution modes:
+//
+// 1. Node runtimes (local dev, Render): a persistent pg Pool. Long-lived
+//    sockets are fine there.
+//
+// 2. Cloudflare Workers (useHyperdrive = true): a FRESH pg Client per query,
+//    per Cloudflare's official Hyperdrive pattern. pg clients cannot be
+//    safely reused on Workers — once a socket goes stale, queries hang and
+//    the runtime kills the request ("Worker's code had hung"). Hyperdrive
+//    keeps the real connection pool to Supabase, so opening a client here is
+//    cheap (single-digit ms inside Cloudflare's network).
+let pool = null;          // Node mode
+let dbConfig = null;      // { connectionString } injected by worker/index.js
+let useHyperdrive = false;
+
+function configureDatabase({ connectionString } = {}) {
+  if (connectionString) {
+    dbConfig = { connectionString };
+    useHyperdrive = true;
+  }
 }
 
-const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])/.test(connectionString);
-const pool = new Pool({
-  connectionString,
-  ssl: isLocal ? false : { rejectUnauthorized: false },
-});
+function resolveConnectionString() {
+  return (dbConfig && dbConfig.connectionString) || process.env.DATABASE_URL;
+}
+
+function getPool() {
+  if (pool) return pool;
+
+  const connectionString = resolveConnectionString();
+  if (!connectionString) {
+    throw new Error(
+      'DATABASE_URL is not set. Add it to your .env file (Supabase Dashboard -> Project Settings -> Database -> Connection string).'
+    );
+  }
+
+  pool = new Pool({
+    connectionString,
+    // Direct (non-Hyperdrive) connections to Supabase need TLS.
+    ssl: isLocalConn(connectionString) ? false : { rejectUnauthorized: false },
+  });
+
+  // Without this listener, an idle connection being dropped by the server
+  // emits an unhandled 'error' event that crashes the whole process.
+  pool.on('error', (err) => {
+    console.error('Idle Postgres client error (pool continues):', err.message);
+  });
+
+  return pool;
+}
+
+function isLocalConn(cs) {
+  return /@(localhost|127\.0\.0\.1|\[::1\])/.test(cs);
+}
+
+// Workers mode: fresh Client per query (see mode notes above).
+async function execViaFreshClient(sql, params) {
+  const connectionString = resolveConnectionString();
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set (Hyperdrive connection string missing).');
+  }
+
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    return await client.query(sql, params);
+  } finally {
+    // Release the socket immediately so it can't go stale. Race a short
+    // timeout so a dead socket can never hang the response.
+    await Promise.race([
+      client.end().catch(() => {}),
+      new Promise((res) => setTimeout(res, 2000)),
+    ]);
+  }
+}
+
+async function execQuery(sql, params) {
+  if (useHyperdrive) {
+    return execViaFreshClient(sql, params);
+  }
+  return getPool().query(sql, params);
+}
 
 // Convert sqlite-style `?` placeholders to Postgres `$1, $2, ...`
 function toPgSql(sql) {
@@ -33,7 +103,7 @@ const runQuery = async (sql, params = []) => {
   if (/^\s*INSERT\b/i.test(text) && !/\bRETURNING\b/i.test(text)) {
     text += ' RETURNING id';
   }
-  const res = await pool.query(text, params);
+  const res = await execQuery(text, params);
   return {
     changes: res.rowCount,
     lastID: res.rows.length > 0 && res.rows[0] && res.rows[0].id != null ? res.rows[0].id : null,
@@ -42,13 +112,13 @@ const runQuery = async (sql, params = []) => {
 
 // Mimics sqlite3's get: resolves with the first row or null.
 const getQuery = async (sql, params = []) => {
-  const res = await pool.query(toPgSql(sql), params);
+  const res = await execQuery(toPgSql(sql), params);
   return res.rows[0] || null;
 };
 
 // Mimics sqlite3's all: resolves with all rows.
 const allQuery = async (sql, params = []) => {
-  const res = await pool.query(toPgSql(sql), params);
+  const res = await execQuery(toPgSql(sql), params);
   return res.rows;
 };
 
@@ -268,39 +338,41 @@ async function initDatabase() {
   `);
 
   await seedInitialData();
+
+  // Password reset support (added post-launch): secure token + expiry per user.
+  await runQuery(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT
+  `);
+  await runQuery(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ
+  `);
 }
 
 async function seedInitialData() {
-  // Check if users already seeded
-  const userCount = await getQuery('SELECT COUNT(*) as count FROM users');
-  if (parseInt(userCount.count, 10) === 0) {
-    console.log('Seeding initial users...');
-    const adminPassword = await bcrypt.hash('admin123', 10);
-    const customerPassword = await bcrypt.hash('customer123', 10);
+  // Ensure the real store owner has an admin account. No demo users — the
+  // password comes from the environment (ADMIN_PASSWORD / INITIAL_ADMIN_PASSWORD)
+  // and must be set on a fresh database; otherwise a random one is generated
+  // and printed once to the server log.
+  const ADMIN_EMAIL = 'rasheedabdulrasheed@gmail.com';
+  const existingAdmin = await getQuery('SELECT id FROM users WHERE email = ?', [ADMIN_EMAIL]);
+  if (!existingAdmin) {
+    const envPassword = process.env.ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD;
+    const generated = !envPassword;
+    const plainPassword = envPassword || require('crypto').randomBytes(12).toString('base64url');
+    const adminPassword = await bcrypt.hash(plainPassword, 10);
 
     await runQuery(
-      `INSERT INTO users (name, email, password_hash, role, phone, address) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        'KATHRAZ Admin',
-        'admin@kathraz.com',
-        adminPassword,
-        'admin',
-        '+91 98765 43210',
-        'Heritage Distillery Lane, Perfume Bazaar, Kannauj, UP'
-      ]
+      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')`,
+      ['KATHRAZ Admin', ADMIN_EMAIL, adminPassword]
     );
 
-    await runQuery(
-      `INSERT INTO users (name, email, password_hash, role, phone, address) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        'Tariq Al-Mansoor',
-        'customer@kathraz.com',
-        customerPassword,
-        'customer',
-        '+91 98765 43210',
-        '74 Park Avenue, Bandra West, Mumbai, MH'
-      ]
-    );
+    if (generated) {
+      console.log('='.repeat(60));
+      console.log(`Admin account created for ${ADMIN_EMAIL}`);
+      console.log(`Temporary password: ${plainPassword}`);
+      console.log('Set ADMIN_PASSWORD in your .env to choose it yourself next time.');
+      console.log('='.repeat(60));
+    }
   }
 
   // Check if categories seeded
@@ -416,39 +488,16 @@ async function seedInitialData() {
       ('WELCOME500', 'fixed', 500, 4000, 200, 18, 1)
     `);
 
-    // Seed initial demo reviews
-    await runQuery(`
-      INSERT INTO reviews (product_id, user_name, rating, title, comment) VALUES
-      (${p1Id}, 'His Highness Prince Z.', 5, 'Absolute Regal Excellence', 'The Oud quality is astonishing. Having collected Creed and Amouage for years, KATHRAZ Oud Royal surpasses them in sillage and depth. Truly regal.'),
-      (${p1Id}, 'Dr. Ananya Sharma', 5, 'Unmatched Longevity', 'Sprayed this at 8 AM and could still smell warm amber and rose at midnight! Worth every single rupee.'),
-      (${p2Id}, 'Sophia V.', 5, 'Sensual & Cashmere Soft', 'The rose is not synthetic at all. It feels like fresh damask petals dipped in warm golden amber.')
-    `);
-
-    // Seed initial orders for admin analytics
-    const order1 = await runQuery(`
-      INSERT INTO orders (order_number, user_id, customer_name, customer_email, shipping_address, phone, payment_method, payment_status, order_status, subtotal, discount_amount, shipping_fee, total_amount, tracking_number, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL '2 days')
-    `, ['KTZ-89210', 2, 'Tariq Al-Mansoor', 'customer@kathraz.com', '74 Park Avenue, Bandra West, Mumbai, MH', '+91 98765 43210', 'Razorpay', 'Paid', 'Shipped', 12900, 1290, 0, 11610, 'KEX-908231']);
-
-    await runQuery(`
-      INSERT INTO order_items (order_id, product_id, variant_id, product_title, size_label, price, quantity, total)
-      VALUES (?, ?, 1, 'KATHRAZ Oud Royal', '50ml Extrait', 12900, 1, 12900)
-    `, [order1.lastID, p1Id]);
-
-    const order2 = await runQuery(`
-      INSERT INTO orders (order_number, user_id, customer_name, customer_email, shipping_address, phone, payment_method, payment_status, order_status, subtotal, discount_amount, shipping_fee, total_amount, tracking_number, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL '5 days')
-    `, ['KTZ-89209', 2, 'Tariq Al-Mansoor', 'customer@kathraz.com', '74 Park Avenue, Bandra West, Mumbai, MH', '+91 98765 43210', 'Razorpay', 'Paid', 'Delivered', 9800, 0, 0, 9800, 'KEX-882711']);
-
-    await runQuery(`
-      INSERT INTO order_items (order_id, product_id, variant_id, product_title, size_label, price, quantity, total)
-      VALUES (?, ?, 4, 'KATHRAZ Velvet Rose & Amber', '50ml EDP', 9800, 1, 9800)
-    `, [order2.lastID, p2Id]);
+    // NOTE: no demo reviews or demo orders are seeded — a live store starts
+    // with a clean slate. Add real reviews/orders through the app or admin.
   }
 }
 
 module.exports = {
-  db: pool,
+  get db() {
+    return getPool();
+  },
+  configureDatabase,
   runQuery,
   getQuery,
   allQuery,

@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 
 export default function LoginPage() {
-  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -13,13 +12,6 @@ export default function LoginPage() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (searchParams.get('demo') === 'admin') {
-      setEmail('admin@kathraz.com');
-      setPassword('admin123');
-    }
-  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,16 +31,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemoAdmin = () => {
-    setEmail('admin@kathraz.com');
-    setPassword('admin123');
-  };
-
-  const fillDemoCustomer = () => {
-    setEmail('customer@kathraz.com');
-    setPassword('customer123');
-  };
-
   return (
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-2">
@@ -63,29 +45,6 @@ export default function LoginPage() {
             {error}
           </div>
         )}
-
-        {/* Demo Fast Login Bar */}
-        <div className="p-3 rounded-xl bg-gold/10 border border-gold/30 space-y-2 text-xs">
-          <span className="text-ivory font-bold flex items-center gap-1 uppercase tracking-wider text-[11px]">
-            Quick demo login
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={fillDemoAdmin}
-              className="py-1.5 px-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
-            >
-              Demo admin
-            </button>
-            <button
-              type="button"
-              onClick={fillDemoCustomer}
-              className="py-1.5 px-2 bg-card hover:bg-ivory hover:text-obsidian border border-ivory/30 rounded text-[11px] font-semibold text-ivory transition-colors text-center"
-            >
-              Demo customer
-            </button>
-          </div>
-        </div>
 
         {/* Google sign-in */}
         <div>
@@ -134,6 +93,12 @@ export default function LoginPage() {
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-gold text-[11px] font-semibold hover:underline">
+              Forgot password?
+            </Link>
+          </div>
         </form>
 
         <div className="text-center text-xs text-muted border-t border-gold/15 pt-4">

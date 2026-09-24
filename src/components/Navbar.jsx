@@ -205,17 +205,6 @@ export default function Navbar({ onOpenSearch }) {
                     >
                       Create Account
                     </Link>
-                    <div className="px-4 py-2 border-t border-ivory/10 mt-1">
-                      <button
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          navigate('/login?demo=admin');
-                        }}
-                        className="w-full text-xs text-center py-1.5 text-muted hover:text-ivory transition-colors"
-                      >
-                        Demo admin login
-                      </button>
-                    </div>
                   </>
                 )}
               </div>

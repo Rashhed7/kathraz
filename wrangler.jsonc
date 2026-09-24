@@ -1,0 +1,61 @@
+// Cloudflare Workers configuration — KATHRAZ Fragrances
+// Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kathraz",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Vite build output (React SPA + public/images copied in by `vite build`).
+  // Cloudflare serves every file here from its CDN for free.
+  "assets": {
+    "directory": "./dist",
+    // Only API requests reach the Express Worker; everything else is CDN-served.
+    // Unknown paths fall back to index.html (React Router handles them).
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Alias iconv-lite to a UTF-8-only shim: the real package uses Node streams
+  // APIs at load time that the Workers runtime can't validate. body-parser only
+  // needs getDecoder() for UTF-8 JSON bodies.
+  "alias": {
+    "iconv-lite": "./worker/shims/iconv-lite.js"
+  },
+
+  // Cloudflare's Postgres proxy/pooler in front of Supabase.
+  // Terminates the DB protocol inside Cloudflare's network (fixes pg's TLS
+  // handshake on Workers) and pools connections across requests.
+  // The origin string was provided via `wrangler hyperdrive create ... --connection-string`.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "029e84fca3ad4a8994188824d296b485"
+    }
+  ],
+
+  // Keep the kathraz.kathraz.workers.dev URL working as a backup alongside
+  // the custom domains.
+  "workers_dev": true,
+
+  // Custom domains attached to this Worker. Requires the kathraz.store zone
+  // to be active in the same Cloudflare account (nameservers moved from GoDaddy).
+  // Cloudflare provisions DNS + SSL automatically for both.
+  "routes": [
+    { "pattern": "kathraz.store", "custom_domain": true },
+    { "pattern": "www.kathraz.store", "custom_domain": true }
+  ],
+
+  // Env vars that are safe to commit. Secrets (DATABASE_URL, JWT_SECRET,
+  // SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID,
+  // RAZORPAY_KEY_SECRET, GOOGLE_CLIENT_ID) are set with
+  // `npx wrangler secret put <NAME>` — see README-CLOUDFLARE.md.
+  "vars": {
+    "NODE_ENV": "production",
+    "CLOUDFLARE": "1",
+    // Canonical site URL — used to build absolute links in emails (password
+    // resets, order confirmations) instead of relying on request headers.
+    "PUBLIC_SITE_URL": "https://kathraz.store"
+  }
+}

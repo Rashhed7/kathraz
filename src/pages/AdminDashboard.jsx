@@ -11,6 +11,15 @@ export default function AdminDashboard() {
   const { formatPrice } = useCart();
   const navigate = useNavigate();
 
+  // Turn a title into a URL-friendly slug — mirrors the backend's slugify()
+  // so the preview shown in the editor matches what actually gets saved.
+  const slugify = (title) =>
+    String(title)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
   const [activeTab, setActiveTab] = useState('analytics');
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +56,11 @@ export default function AdminDashboard() {
     is_featured: true,
     is_bestseller: false
   });
+  // Custom URL slug. When the admin hasn't touched the field (slugTouched),
+  // it live-previews slugify(title); once edited by hand it follows the
+  // admin's input instead.
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [gallery, setGallery] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
@@ -87,9 +101,81 @@ export default function AdminDashboard() {
   const [adLink, setAdLink] = useState('');
   const [adError, setAdError] = useState('');
 
+  // Admin management state (Admins tab)
+  const [admins, setAdmins] = useState([]);
+  const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '', phone: '' });
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminError, setAdminError] = useState('');
+  const [adminNotice, setAdminNotice] = useState('');
+  const [pwModal, setPwModal] = useState(null); // { id, name, password }
+
+  const loadAdmins = async () => {
+    try {
+      const res = await fetch('/api/admin/admins', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdmins(data.admins || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddAdmin = async (e) => {
+    e.preventDefault();
+    setAdminError('');
+    setAdminNotice('');
+    setAdminBusy(true);
+    try {
+      const res = await fetch('/api/admin/admins', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAdmin)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create admin');
+      setAdminNotice(`Admin "${data.admin.name}" created.`);
+      setNewAdmin({ name: '', email: '', password: '', phone: '' });
+      loadAdmins();
+    } catch (err) {
+      setAdminError(err.message);
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  // Fetch the admin roster whenever the Admins tab is opened
+  useEffect(() => {
+    if (activeTab === 'admins') loadAdmins();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const adminAction = async (method, path, body) => {
+    setAdminError('');
+    setAdminNotice('');
+    setAdminBusy(true);
+    try {
+      const res = await fetch(path, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Action failed');
+      setAdminNotice(data.message || 'Done');
+      loadAdmins();
+    } catch (err) {
+      setAdminError(err.message);
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!token || !isAdmin) {
-      navigate('/login?demo=admin');
+      navigate('/login');
       return;
     }
     loadDashboardData();
@@ -202,6 +288,8 @@ export default function AdminDashboard() {
       const payload = {
         ...productForm,
         sale_price: newSale,
+        // Send the slug the admin chose; empty means "auto-generate from title"
+        slug: slugTouched ? slug.trim() : '',
         gallery,
         variants: variants.map((v) => {
           let price = Number(v.price);
@@ -594,6 +682,8 @@ export default function AdminDashboard() {
     setSaveError('');
     setGallery([]);
     setVariants([{ ...emptyVariant(), size_label: '50ml', price: 9800, stock_quantity: 50 }]);
+    setSlug('');
+    setSlugTouched(false);
     setProductForm({
       title: '',
       subtitle: '',
@@ -634,6 +724,10 @@ export default function AdminDashboard() {
       try { gal = JSON.parse(p.gallery_json); } catch { gal = []; }
     }
     setGallery(gal);
+    setSlug(p.slug || '');
+    // A stored slug that differs from slugify(title) was customized by hand —
+    // lock it (touched) so saving doesn't clobber it with auto-generation.
+    setSlugTouched((p.slug || '') !== slugify(p.title || ''));
     setProductForm({
       title: p.title,
       subtitle: p.subtitle || '',
@@ -688,7 +782,8 @@ export default function AdminDashboard() {
           { id: 'inquiries', label: `Inquiries${newInquiriesCount > 0 ? ` (${newInquiriesCount})` : ''}`, icon: Inbox },
           { id: 'posts', label: `Reels (${feedPosts.length})`, icon: Instagram },
           { id: 'ads', label: `Ads (${adBanners.length})`, icon: Megaphone },
-          { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag }
+          { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag },
+          { id: 'admins', label: `Admins (${admins.length})`, icon: Shield }
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -1362,6 +1457,30 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* URL slug — auto-follows the title until edited by hand */}
+              <div>
+                <label className="text-muted block mb-1">URL slug</label>
+                <input
+                  type="text"
+                  value={slugTouched ? slug : slugify(productForm.title)}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setSlug(e.target.value);
+                  }}
+                  onBlur={() =>
+                    setSlug((s) =>
+                      s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+                    )
+                  }
+                  placeholder="auto-generated from title"
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+                <p className="text-muted mt-1">
+                  Product page: <span className="text-gold/80">/product/{(slugTouched ? slugify(slug) : slugify(productForm.title)) || '…'}</span>
+                  {!slugTouched && ' (follows the title — type to customize)'}
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-muted block mb-1">Category</label>
@@ -1666,6 +1785,172 @@ export default function AdminDashboard() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* TAB: ADMINS */}
+      {activeTab === 'admins' && (
+        <div className="space-y-6 animate-fadeIn">
+          <h2 className="font-sans text-xl font-bold text-ivory">Manage Admins</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            {/* Add admin form */}
+            <form onSubmit={handleAddAdmin} className="md:col-span-4 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-4 text-xs">
+              <h3 className="font-sans text-base font-bold text-gold">Add a new admin</h3>
+
+              {adminError && (
+                <div className="bg-charcoal border border-ivory/40 text-ivory text-[11px] px-3 py-2 rounded">{adminError}</div>
+              )}
+              {adminNotice && (
+                <div className="bg-charcoal border border-gold/50 text-gold text-[11px] px-3 py-2 rounded">{adminNotice}</div>
+              )}
+
+              <div>
+                <label className="text-muted block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={newAdmin.name}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
+                  required
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-muted block mb-1">Email</label>
+                <input
+                  type="email"
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                  required
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-muted block mb-1">Phone (optional)</label>
+                <input
+                  type="tel"
+                  value={newAdmin.phone}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-muted block mb-1">Password (min 8 chars)</label>
+                <input
+                  type="text"
+                  value={newAdmin.password}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                  required
+                  minLength={8}
+                  placeholder="Share this with them securely"
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={adminBusy}
+                className="w-full btn-gold py-3 rounded-lg font-bold uppercase tracking-wider disabled:opacity-60"
+              >
+                {adminBusy ? 'Working…' : 'Create admin'}
+              </button>
+            </form>
+
+            {/* Admin roster */}
+            <div className="md:col-span-8 space-y-3">
+              {admins.map((a) => {
+                const isSelf = a.id === user?.id;
+                const isLastAdmin = admins.length <= 1;
+                return (
+                  <div key={a.id} className="bg-card border border-gold/20 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <strong className="text-ivory text-sm">{a.name}</strong>
+                        {isSelf && (
+                          <span className="text-[10px] bg-gold/15 border border-gold/40 text-gold px-2 py-0.5 rounded-full font-bold uppercase">You</span>
+                        )}
+                      </div>
+                      <div className="font-num text-xs text-gold">{a.email}</div>
+                      {a.phone && <div className="font-num text-[11px] text-muted">{a.phone}</div>}
+                      <div className="text-[10px] text-muted font-num">Admin since {new Date(a.created_at).toLocaleDateString()}</div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <button
+                        onClick={() => setPwModal({ id: a.id, name: a.name, password: '' })}
+                        disabled={adminBusy}
+                        className="px-3 py-2 rounded-lg border border-gold/40 text-gold hover:bg-gold hover:text-charcoal transition-colors font-bold uppercase tracking-wider disabled:opacity-50"
+                      >
+                        Reset password
+                      </button>
+                      {!isSelf && !isLastAdmin && (
+                        <button
+                          onClick={() => adminAction('PUT', `/api/admin/admins/${a.id}/role`, { role: 'customer' })}
+                          disabled={adminBusy}
+                          className="px-3 py-2 rounded-lg border border-ivory/30 text-ivory/80 hover:bg-ivory hover:text-charcoal transition-colors font-bold uppercase tracking-wider disabled:opacity-50"
+                        >
+                          Demote
+                        </button>
+                      )}
+                      {!isSelf && !isLastAdmin && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Remove admin "${a.name}"? They will no longer have dashboard access.`)) {
+                              adminAction('DELETE', `/api/admin/admins/${a.id}`);
+                            }
+                          }}
+                          disabled={adminBusy}
+                          className="px-3 py-2 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500 hover:text-ivory transition-colors font-bold uppercase tracking-wider disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {admins.length === 0 && (
+                <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+                  No admins found.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Reset password modal */}
+          {pwModal && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setPwModal(null)}>
+              <div className="bg-card border border-gold/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="font-sans text-base font-bold text-gold">Reset password — {pwModal.name}</h3>
+                <input
+                  type="text"
+                  autoFocus
+                  value={pwModal.password}
+                  onChange={(e) => setPwModal({ ...pwModal, password: e.target.value })}
+                  placeholder="New password (min 8 chars)"
+                  className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded text-xs focus:outline-none"
+                />
+                <div className="flex gap-2 justify-end text-xs">
+                  <button
+                    onClick={() => setPwModal(null)}
+                    className="px-4 py-2 rounded-lg border border-ivory/30 text-ivory/80 hover:bg-ivory hover:text-charcoal transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={adminBusy || pwModal.password.length < 8}
+                    onClick={async () => {
+                      await adminAction('PUT', `/api/admin/admins/${pwModal.id}/password`, { password: pwModal.password });
+                      setPwModal(null);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-gold text-charcoal font-bold uppercase tracking-wider disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
