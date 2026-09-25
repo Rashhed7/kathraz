@@ -72,11 +72,6 @@ export default function InvoiceDocument({ order }) {
         <div style={{ fontSize: 13, color: '#000000', marginTop: 6, fontWeight: 600 }}>
           Phone: {order.phone}
         </div>
-        {order.tracking_number && (
-          <div style={{ fontSize: 11, color: '#6B6B6B', marginTop: 8 }}>
-            Courier: {order.courier_name} · Tracking: <span style={{ fontWeight: 700, color: '#000000' }}>{order.tracking_number}</span>
-          </div>
-        )}
       </div>
 
       {/* Items table */}

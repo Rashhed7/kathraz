@@ -232,7 +232,7 @@ async function initDatabase() {
       shipping_fee REAL DEFAULT 0,
       total_amount REAL NOT NULL,
       tracking_number TEXT,
-      courier_name TEXT DEFAULT 'Royal Express Logistics',
+      courier_name TEXT,
       gift_message TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
@@ -346,6 +346,13 @@ async function initDatabase() {
   await runQuery(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ
   `);
+
+  // Courier/tracking are now entered MANUALLY by the admin when marking an
+  // order Shipped — drop the old auto-courier default and clear the fake
+  // auto-generated values from earlier orders.
+  await runQuery(`ALTER TABLE orders ALTER COLUMN courier_name DROP DEFAULT`);
+  await runQuery(`UPDATE orders SET courier_name = NULL WHERE courier_name = 'Royal Express Logistics'`);
+  await runQuery(`UPDATE orders SET tracking_number = NULL WHERE tracking_number LIKE 'KEX-%'`);
 }
 
 async function seedInitialData() {

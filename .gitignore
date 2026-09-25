@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 server/kathraz_database.sqlite
+tail.log
+tail-log.txt
+local_server.log
+build_out.txt

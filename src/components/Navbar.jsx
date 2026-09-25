@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, User, Menu, X, Globe, Shield } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 
-// Scrolling greetings & offers — edit this list to change the ticker
-const ANNOUNCEMENTS = [
+// Horizontal marquee content — edit this list to change the strip
+const MARQUEE_ITEMS = [
   'Welcome to KATHRAZ',
-  'Complimentary shipping on orders over ₹5,000',
-  'Code KATHRAZ10 — 10% off your first order',
-  'WELCOME500 — flat ₹500 off orders above ₹4,000',
-  'We deliver across India · Hand-poured in small batches',
+  'We deliver across India',
 ];
+
+// Each half of the marquee repeats the messages enough times to be wider
+// than any viewport, so the -50% translate loops with no blank gaps.
+const MARQUEE_REPEAT = 4;
+const MARQUEE_COPY = Array.from({ length: MARQUEE_REPEAT }).flatMap(() => MARQUEE_ITEMS);
 
 export default function Navbar({ onOpenSearch }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -33,13 +35,47 @@ export default function Navbar({ onOpenSearch }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Close the mobile drawer / user dropdown with Escape, and auto-close the
+  // drawer whenever the route changes (tapping a link navigates in place).
+  const location = useLocation();
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen && !isUserMenuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        setIsUserMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isMobileMenuOpen, isUserMenuOpen]);
+
   return (
     <>
-      {/* Announcement bar — scrolls away with the page (not sticky). */}
-      <div className="bg-ivory text-obsidian text-[11px] tracking-[0.15em] uppercase text-center">
-        <span className="block py-2 px-4">
-          {ANNOUNCEMENTS[new Date().getDate() % ANNOUNCEMENTS.length]}
-        </span>
+      {/* Announcement bar — horizontal marquee: the strip slides right to
+          left in a seamless loop with a thin pipe separator between messages.
+          Scrolls away with the page (not sticky). Content is rendered twice
+          and the track translated -50% for the gapless loop. */}
+      <div className="bg-ivory text-obsidian text-[11px] tracking-[0.15em] uppercase overflow-hidden">
+        <div
+          className="marquee-track flex w-max items-center"
+          style={{ '--ticker-duration': `${MARQUEE_COPY.length * 7}s` }}
+        >
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex items-center shrink-0" aria-hidden={copy === 1}>
+              {MARQUEE_COPY.map((text, i) => (
+                <div key={i} className="flex items-center shrink-0">
+                  <span className="py-2 px-4 whitespace-nowrap">{text}</span>
+                  <span className="text-obsidian/40 font-light" aria-hidden="true">|</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       <header
@@ -55,10 +91,11 @@ export default function Navbar({ onOpenSearch }) {
         <div className="lg:hidden flex items-center shrink-0">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-ivory hover:text-muted p-2 transition-colors"
-            aria-label="Toggle Navigation"
+            className="text-ivory hover:text-muted p-2 -ml-2 transition-colors"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileMenuOpen}
           >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
@@ -146,7 +183,7 @@ export default function Navbar({ onOpenSearch }) {
           </button>
 
           {/* Account Dropdown — moved to drawer on phones */}
-          <div className="hidden sm:block relative">
+          <div className="hidden lg:block relative">
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="p-2 text-ivory/70 hover:text-ivory transition-colors"
@@ -213,24 +250,24 @@ export default function Navbar({ onOpenSearch }) {
         </div>
       </nav>
 
-      {/* Mobile Drawer Navigation */}
+      {/* Mobile Drawer Navigation — items are large, comfortable tap targets */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden bg-obsidian border-b border-ivory/10 px-6 py-6 space-y-1 text-sm animate-fadeIn">
-          <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Home</Link>
-          <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Shop All</Link>
-          <Link to="/shop?category=personal-fragrances" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Extrait de Parfum</Link>
-          <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">FAQ & Support</Link>
-          <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Track an Order</Link>
-          <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">
+        <div className="lg:hidden bg-obsidian border-b border-ivory/10 px-5 py-5 space-y-1 text-sm animate-fadeIn">
+          <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Home</Link>
+          <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Shop All</Link>
+          <Link to="/shop?category=personal-fragrances" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Extrait de Parfum</Link>
+          <Link to="/faq" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">FAQ & Support</Link>
+          <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Track an Order</Link>
+          <Link to="/shop?wishlist=true" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">
             My Wishlist{wishlistCount > 0 ? ` (${wishlistCount})` : ''}
           </Link>
           <div className="border-t border-ivory/10 my-2" />
           {user ? (
             <>
-              <div className="py-1 text-xs text-muted">{user.name}</div>
-              <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">My Orders</Link>
+              <div className="py-1.5 text-xs text-muted">{user.name}</div>
+              <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">My Orders</Link>
               {isAdmin && (
-                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Admin</Link>
+                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Admin</Link>
               )}
               <button
                 onClick={() => {
@@ -238,15 +275,15 @@ export default function Navbar({ onOpenSearch }) {
                   setIsMobileMenuOpen(false);
                   navigate('/');
                 }}
-                className="block w-full text-left py-2.5 text-muted hover:text-ivory"
+                className="block w-full text-left py-3 text-base text-muted hover:text-ivory"
               >
                 Sign Out
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Sign In</Link>
-              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="block py-2.5 text-ivory hover:text-muted">Create Account</Link>
+              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Sign In</Link>
+              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="block py-3 text-base text-ivory hover:text-muted">Create Account</Link>
             </>
           )}
         </div>

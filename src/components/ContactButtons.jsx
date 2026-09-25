@@ -21,7 +21,7 @@ export default function ContactButtons() {
   if (pathname.startsWith('/checkout') || pathname.startsWith('/admin')) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2.5">
+    <div className="fixed z-40 flex flex-col items-end gap-2.5 safe-bottom-float">
       <a
         href={TEL_URL}
         aria-label={`Call us on ${PHONE_DISPLAY}`}

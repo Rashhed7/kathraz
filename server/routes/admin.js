@@ -335,6 +335,14 @@ router.put('/orders/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid order status transition' });
     }
 
+    // Courier is written MANUALLY by the admin when marking an order Shipped.
+    if (order_status === 'Shipped' && !courier_name) {
+      const existing = await getQuery('SELECT courier_name FROM orders WHERE id = ?', [id]);
+      if (!existing || !existing.courier_name) {
+        return res.status(400).json({ error: 'Courier service name is required when marking an order Shipped' });
+      }
+    }
+
     let sql = 'UPDATE orders SET id = id';
     const params = [];
 
@@ -377,14 +385,51 @@ router.put('/orders/:id/status', async (req, res) => {
         trackingNumber: tracking_number,
         courierName: courier_name,
       });
-      sendEmail({ to: updated.customer_email, subject, html, text }).catch((err) =>
-        console.error('[status-email] failed:', err.message)
-      );
+      // Awaited — on Cloudflare Workers the isolate is frozen once the
+      // response is sent, so fire-and-forget fetches are killed silently.
+      try {
+        await sendEmail({ to: updated.customer_email, subject, html, text });
+      } catch (emailErr) {
+        console.error('[status-email] failed:', emailErr.message);
+      }
     }
 
     res.json({ message: `Order status updated to ${updated.order_status}`, order: updated });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order status' })
+  }
+});
+
+// Delete an order entirely (admin cleanup: test orders, mistakes).
+// Also removes its items + payment records and RESTORES the stock that was
+// deducted when the order was placed.
+router.delete('/orders/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const order = await getQuery('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Restore stock for every item in this order.
+    const items = await allQuery('SELECT variant_id, quantity FROM order_items WHERE order_id = ?', [id]);
+    for (const item of items) {
+      if (item.variant_id) {
+        await runQuery(
+          'UPDATE variants SET stock_quantity = stock_quantity + ? WHERE id = ?',
+          [item.quantity, item.variant_id]
+        );
+      }
+    }
+
+    await runQuery('DELETE FROM payments WHERE order_id = ?', [id]);
+    await runQuery('DELETE FROM order_items WHERE order_id = ?', [id]);
+    await runQuery('DELETE FROM orders WHERE id = ?', [id]);
+
+    res.json({ message: `Order ${order.order_number} deleted (stock restored)` });
+  } catch (error) {
+    console.error('Order delete error:', error);
+    res.status(500).json({ error: 'Failed to delete order' });
   }
 });
 

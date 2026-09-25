@@ -21,6 +21,84 @@ body {
   color: #000000;
   font-family: 'Plus Jakarta Sans', sans-serif;
   overflow-x: hidden;
+  /* Prevent iOS Safari from reflowing text when the device rotates */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ---- Mobile / touch optimizations (Android + iOS) ---- */
+
+/* 16px inputs: iOS Safari auto-zooms any focused input below 16px, which
+   breaks layouts and leaves the page stuck zoomed-in. All form controls
+   (which Tailwind styles at text-xs / 12px) get bumped to 16px on touch
+   screens; visual font-size compensation is unnecessary because the inputs
+   were always legible — this only stabilizes focus behavior. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Tap highlight: iOS flashes a gray box on tapped elements. Keep a subtle
+   brand-consistent highlight instead of none (none harms accessibility). */
+html {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Comfortable touch behavior on coarse pointers (Android/iOS).
+   Apple HIG: 44px; Material: 48dp — individual controls are sized in the
+   components; here we only remove the legacy tap delay and flash. */
+@media (pointer: coarse) {
+  a,
+  button,
+  select,
+  input[type='checkbox'],
+  input[type='radio'] {
+    touch-action: manipulation; /* kills 300ms double-tap zoom on old Android */
+  }
+}
+
+/* Safe areas (notched iPhones, Android cutouts): the fixed drawer, modals
+   and floating buttons respect the home indicator / notch. */
+.safe-px {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+.safe-pb {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+.safe-bottom-float {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  right: calc(1.25rem + env(safe-area-inset-right));
+}
+
+/* iOS Safari: elastic overscroll must not show white beyond the page bg
+   (page is white, so simply keep the canvas consistent) */
+@supports (-webkit-touch-callout: none) {
+  html {
+    background: #FFFFFF;
+  }
+}
+
+/* Body scroll lock for open drawers/modals (class toggled by a hook).
+   The hook sets top:-scrollY so the page doesn't jump when position:fixed
+   kicks in — the only reliable background-scroll stop on iOS Safari. */
+body.mobile-scroll-locked {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  left: 0;
+  right: 0;
+}
+
+/* Table rows keep readable padding on small screens instead of dense px-4 */
+@media (max-width: 640px) {
+  table th,
+  table td {
+    white-space: normal;
+  }
 }
 
 /* ---- Scroll reveal system (driven by <Reveal/>) ----
@@ -220,6 +298,16 @@ h1, h2, h3, h4 {
   }
 }
 
+/* Horizontal scroll strips (admin tabs, galleries): scrollbar hidden but
+   content swipeable — standard mobile pattern. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Single, quiet page-enter fade used across pages */
 @keyframes pageFade {
   from { opacity: 0; }
@@ -230,10 +318,14 @@ h1, h2, h3, h4 {
   animation: pageFade 0.25s ease-out forwards;
 }
 
-/* Route transition — subtle rise-and-fade when navigating between pages */
+/* Route transition — subtle rise-and-fade when navigating between pages.
+   IMPORTANT: the `to` keyframe must resolve to transform: none (not
+   translateY(0)) — fill-mode keeps the last keyframe applied, and any
+   non-none transform creates a containing block that would hijack
+   position:fixed overlays (modals, mobile action bars) inside the page. */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .animate-pageIn {
@@ -400,4 +492,74 @@ h1, h2, h3, h4 {
 
 .sheen::after {
   content: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Horizontal announcement marquee (top bar): the strip slides right   */
+/* to left in a seamless loop, with the logo separator between         */
+/* messages. Content is duplicated and translated -50% for the loop.   */
+/* ------------------------------------------------------------------ */
+@keyframes horizontalTicker {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.marquee-track {
+  animation: horizontalTicker var(--ticker-duration, 30s) linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Order-confirmed popup: card pops in, halo pings once behind the     */
+/* check icon. One-shot animations, reduced-motion safe.               */
+/* ------------------------------------------------------------------ */
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(12px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-popIn {
+  animation: popIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pingOnce {
+  0% { opacity: 0.7; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+.animate-ping-once {
+  animation: pingOnce 0.9s ease-out 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-popIn,
+  .animate-ping-once {
+    animation: none;
+  }
+}
+
+/* Reels scroll hint */
+@keyframes bounceSoft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+
+.animate-bounce-soft {
+  animation: bounceSoft 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bounce-soft {
+    animation: none;
+  }
 }

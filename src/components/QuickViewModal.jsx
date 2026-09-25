@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Star, ShoppingBag, Heart, Check } from 'lucide-react';
+import { X, Star, ShoppingBag, Heart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import OverlayPortal from './OverlayPortal';
 
 export default function QuickViewModal({ product, onClose }) {
   const { formatPrice, addToCart } = useCart();
@@ -13,31 +15,64 @@ export default function QuickViewModal({ product, onClose }) {
   );
   const [quantity, setQuantity] = useState(1);
 
+  useBodyScrollLock(!!product);
+
+  // Escape closes (and the backdrop tap-to-close below covers touch)
+  useEffect(() => {
+    if (!product) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [product, onClose]);
+
   if (!product) return null;
 
   const isLiked = isWishlisted(product.id);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-obsidian/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-      <div className="w-full max-w-3xl bg-card border border-gold/30 rounded-2xl overflow-hidden shadow-2xl relative grid grid-cols-1 md:grid-cols-2">
+    // Portal to <body>: without it, transformed ancestors (PageTransition /
+    // <Reveal>) hijack position:fixed and the modal opens offset by the
+    // page's scroll position.
+    <OverlayPortal>
+      {/* Backdrop: tapping the dimmed area closes the modal (the card itself
+          stops propagation). The card is capped to the viewport and scrolls
+          INTERNALLY, so the ✕ — pinned to the card — is always reachable,
+          even when the image + details stack taller than a phone screen. */}
+      <div
+        className="fixed inset-0 z-50 bg-obsidian/90 backdrop-blur-md p-3 sm:p-4 flex animate-fadeIn"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Quick view: ${product.title}`}
+      >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="m-auto w-full max-w-3xl max-h-[94vh] flex flex-col bg-card border border-gold/30 rounded-2xl overflow-hidden shadow-2xl relative"
+      >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 text-ivory/60 hover:text-ivory transition-colors p-2 bg-obsidian/60 rounded-full"
+          className="absolute top-3 right-3 z-20 text-ivory/60 hover:text-ivory transition-colors p-2.5 bg-obsidian/90 rounded-full shadow-md"
+          aria-label="Close quick view"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Left Image */}
-        <div className="relative aspect-square bg-obsidian">
-          <img
-            src={product.image_url}
-            alt={product.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
+        {/* Scrollable body: image + info scroll together inside the capped card */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain grid grid-cols-1 md:grid-cols-2">
+          {/* Left Image — slightly shorter band on phones so more details fit
+              above the fold; full square crop from md up */}
+          <div className="relative aspect-[4/3] md:aspect-square bg-obsidian">
+            <img
+              src={product.image_url}
+              alt={product.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-        {/* Right Info */}
-        <div className="p-6 md:p-8 flex flex-col justify-between space-y-4 max-h-[85vh] overflow-y-auto">
+          {/* Right Info */}
+          <div className="p-5 sm:p-6 md:p-8 flex flex-col justify-between space-y-4">
           <div>
             <span className="text-xs uppercase tracking-widest text-gold font-medium">
               {product.concentration}
@@ -87,7 +122,7 @@ export default function QuickViewModal({ product, onClose }) {
                     <button
                       key={v.id}
                       onClick={() => setSelectedVariant(v)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      className={`px-3.5 py-2.5 rounded-lg text-xs font-semibold border transition-all ${
                         selectedVariant?.id === v.id
                           ? 'bg-gold/20 border-gold text-gold shadow-md'
                           : 'border-gold/20 text-ivory/80 hover:border-gold/50'
@@ -132,7 +167,9 @@ export default function QuickViewModal({ product, onClose }) {
             </Link>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+      </div>
+    </OverlayPortal>
   );
 }

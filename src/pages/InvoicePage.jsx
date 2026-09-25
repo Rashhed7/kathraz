@@ -15,20 +15,23 @@ import InvoiceDocument from '../components/InvoiceDocument';
 export default function InvoicePage() {
   const { orderNumber } = useParams();
   const navigate = useNavigate();
-  const { token, isAdmin } = useAuth();
+  const { token, isAdmin, loading } = useAuth();
   const isBulk = !orderNumber;
 
   const [orders, setOrders] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Wait for session restore before judging (see AdminDashboard note) —
+    // on refresh `isAdmin` is briefly false while the token is still valid.
+    if (loading) return;
     if (isBulk && !isAdmin) {
       navigate('/login');
       return;
     }
     fetchInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderNumber, isBulk, isAdmin]);
+  }, [orderNumber, isBulk, isAdmin, loading]);
 
   const fetchInvoices = async () => {
     try {

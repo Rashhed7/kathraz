@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, ShoppingBag, ArrowRight, Gift, Tag, Plus, Minus } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 
 export default function CartDrawer() {
   const {
@@ -26,6 +27,9 @@ export default function CartDrawer() {
   const [couponSuccess, setCouponSuccess] = useState('');
   const [showGiftInput, setShowGiftInput] = useState(false);
   const navigate = useNavigate();
+
+  // Stop the page behind the drawer from scrolling (iOS-safe)
+  useBodyScrollLock(isCartOpen);
 
   if (!isCartOpen) return null;
 
@@ -58,17 +62,18 @@ export default function CartDrawer() {
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-obsidian/80 backdrop-blur-sm transition-opacity animate-fadeIn">
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-card border-l border-gold/20 flex flex-col shadow-2xl">
+      <div className="absolute inset-y-0 right-0 left-0 sm:left-auto flex sm:pl-10">
+        <div className="w-full sm:w-screen max-w-md bg-card border-l border-gold/20 flex flex-col shadow-2xl">
           {/* Drawer Header */}
-          <div className="p-6 border-b border-gold/15 flex items-center justify-between bg-obsidian">
+          <div className="px-5 sm:px-6 py-4 border-b border-gold/15 flex items-center justify-between bg-obsidian">
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-gold" />
-              <h2 className="font-sans text-lg font-bold tracking-wider text-ivory">Your Fragrance Bag</h2>
+              <h2 className="font-sans text-base sm:text-lg font-bold tracking-wider text-ivory">Your Fragrance Bag</h2>
             </div>
             <button
               onClick={() => setIsCartOpen(false)}
-              className="p-2 text-ivory/70 hover:text-ivory transition-colors"
+              className="p-2 -mr-2 text-ivory/70 hover:text-ivory transition-colors"
+              aria-label="Close bag"
             >
               <X className="w-6 h-6" />
             </button>
@@ -96,7 +101,7 @@ export default function CartDrawer() {
           </div>
 
           {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-4 overscroll-contain">
             {cart.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mx-auto border border-gold/20">
@@ -167,7 +172,7 @@ export default function CartDrawer() {
 
           {/* Drawer Footer & Checkout */}
           {cart.length > 0 && (
-            <div className="p-6 border-t border-gold/15 bg-obsidian space-y-4">
+            <div className="px-5 sm:px-6 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-gold/15 bg-obsidian space-y-4">
               {/* Promo Code & Gift Note Toggles */}
               <div className="space-y-2">
                 {appliedCoupon ? (

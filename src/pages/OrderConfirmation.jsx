@@ -281,8 +281,12 @@ function OrderSummaryCard({ order, formatPrice }) {
         <div>
           <strong className="text-ivory block mb-1">Shipping & Tracking</strong>
           <p className="text-ivory">{order.shipping_address}</p>
-          <p className="text-muted font-num mt-1">Courier: {order.courier_name}</p>
-          <p className="text-muted font-num">Tracking ID: {order.tracking_number}</p>
+          {order.courier_name && (
+            <p className="text-muted font-num mt-1">Courier: {order.courier_name}</p>
+          )}
+          {order.tracking_number && (
+            <p className="text-muted font-num">Tracking ID: {order.tracking_number}</p>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link } from 'react-router-dom';
 import { Star, ShoppingBag, Heart, ShieldCheck, Truck, Droplet, Clock, Flame, ChevronRight, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -90,9 +91,9 @@ export default function ProductDetail() {
   const isLiked = isWishlisted(product.id);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
-      {/* Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-xs text-muted font-light">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-16">
+      {/* Breadcrumb — horizontally scrollable if a long product name wraps on small screens */}
+      <nav className="flex items-center space-x-2 text-xs text-muted font-light flex-wrap">
         <Link to="/" className="hover:text-ivory">Home</Link>
         <ChevronRight className="w-3 h-3 text-muted/50" />
         <Link to="/shop" className="hover:text-ivory">Shop</Link>
@@ -101,7 +102,7 @@ export default function ProductDetail() {
       </nav>
 
       {/* Main Product Display */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
         {/* Left Image Gallery */}
         <Reveal variant="left" className="lg:col-span-6 space-y-4">
           <div className="relative aspect-square rounded-2xl overflow-hidden border border-gold/30 bg-obsidian shadow-2xl group">
@@ -186,12 +187,12 @@ export default function ProductDetail() {
           {product.variants && product.variants.length > 0 && (
             <div className="space-y-2">
               <label className="text-xs text-muted uppercase font-semibold block">Select Size / Volume:</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {product.variants.map((v) => (
                   <button
                     key={v.id}
                     onClick={() => setSelectedVariant(v)}
-                    className={`p-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                    className={`p-3.5 rounded-xl border text-xs font-semibold text-left transition-all ${
                       selectedVariant?.id === v.id
                         ? 'bg-gold/20 border-gold text-gold shadow-md'
                         : 'border-gold/20 text-ivory/80 hover:border-gold/50'
@@ -228,8 +229,9 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* Action CTAs */}
-          <div className="flex gap-4 pt-4 border-t border-gold/15">
+          {/* Action CTAs (desktop) — on phones this row is replaced by the
+              fixed bottom bar rendered at the end of the page */}
+          <div className="hidden lg:flex gap-4 pt-4 border-t border-gold/15">
             <button
               onClick={() => addToCart(product, selectedVariant || product.variants[0], quantity)}
               className="flex-1 btn-gold py-4 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-2xl"
@@ -242,6 +244,7 @@ export default function ProductDetail() {
               className={`p-4 rounded-xl border border-gold/30 hover:border-gold transition-colors ${
                 isLiked ? 'bg-gold text-charcoal' : 'text-ivory hover:bg-gold/10'
               }`}
+              aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
               title="Add to Wishlist"
             >
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
@@ -384,6 +387,34 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
+
+      {/* Mobile-only sticky Add to Bag bar. Portaled to <body> because the
+          route transition wrapper keeps a transform applied, which would
+          otherwise hijack position:fixed. pb-28 on the page wrapper reserves
+          room for it. */}
+      {createPortal(
+        <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 bg-card/95 backdrop-blur border-t border-gold/20 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex gap-3">
+            <button
+              onClick={() => addToCart(product, selectedVariant || product.variants[0], quantity)}
+              className="flex-1 btn-gold py-4 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-2xl"
+            >
+              <ShoppingBag className="w-4 h-4" /> Add to Bag
+            </button>
+            <button
+              onClick={() => toggleWishlist(product.id)}
+              className={`px-5 rounded-xl border border-gold/30 hover:border-gold transition-colors shrink-0 ${
+                isLiked ? 'bg-gold text-charcoal' : 'text-ivory hover:bg-gold/10'
+              }`}
+              aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
+              title="Add to Wishlist"
+            >
+              <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

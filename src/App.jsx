@@ -10,6 +10,7 @@ import CartDrawer from './components/CartDrawer';
 import SearchModal from './components/SearchModal';
 import ContactButtons from './components/ContactButtons';
 import Preloader from './components/Preloader';
+import ScrollToTop from './components/ScrollToTop';
 
 // Page transition: fades each route in on navigation. Keyed by pathname so
 // React remounts the wrapper per route, replaying the animation.
@@ -44,6 +45,9 @@ export default function App() {
 
   return (
     <Router>
+      {/* Must live INSIDE <Router> (it uses useLocation). Resets the scroll
+          position to the top on every route change. */}
+      <ScrollToTop />
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>

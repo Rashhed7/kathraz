@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, CreditCard, Lock, MapPin, User, Phone, Mail, ArrowRight, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import ConfirmOrderModal from '../components/ConfirmOrderModal';
 
 export default function CheckoutPage() {
   const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupon, setAppliedCoupon, giftMessage, clearCart, replaceCart } = useCart();
@@ -18,6 +19,9 @@ export default function CheckoutPage() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState('');
   const [cartNotice, setCartNotice] = useState(null);
+
+  // Pre-order confirmation popup (opened by the Complete Order button).
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -137,8 +141,15 @@ export default function CheckoutPage() {
     );
   }
 
-  const handleCreateOrder = async (e) => {
+  // The Complete Order button only OPENS the confirmation popup; the actual
+  // order is placed from inside the popup (placeOrder).
+  const handleSubmit = (e) => {
     e.preventDefault();
+    setError('');
+    setShowConfirm(true);
+  };
+
+  const placeOrder = async () => {
     setError('');
     setPlacingOrder(true);
 
@@ -172,16 +183,22 @@ export default function CheckoutPage() {
         const paid = await openRazorpayCheckout(data);
         if (paid) {
           clearCart();
+          setShowConfirm(false);
           navigate(`/order-confirmation?orderNumber=${data.order.order_number}`);
+        } else {
+          // Dismissed/failed — keep the pending order, close the popup and
+          // surface a retry hint on the checkout form.
+          setShowConfirm(false);
+          setError('Payment was not completed. Your order is saved — press Complete Order again to retry payment.');
         }
-        // If dismissed, keep the order pending — user can retry payment
-        // from checkout (re-submitting creates a fresh Razorpay order).
       } else {
-        // COD Direct Success
+        // COD Direct Success → thank-you page (invoice, tracking & stats).
         clearCart();
+        setShowConfirm(false);
         navigate(`/order-confirmation?orderNumber=${data.order.order_number}`);
       }
     } catch (err) {
+      setShowConfirm(false); // surface the error on the checkout form
       setError(err.message);
     } finally {
       setPlacingOrder(false);
@@ -262,7 +279,7 @@ export default function CheckoutPage() {
         </span>
       </div>
 
-      <form onSubmit={handleCreateOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Shipping & Contact Info */}
         <div className="lg:col-span-7 bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel space-y-6">
           <h2 className="font-sans text-lg font-bold text-ivory flex items-center gap-2 border-b border-gold/15 pb-3">
@@ -288,6 +305,7 @@ export default function CheckoutPage() {
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
+                autoComplete="name"
                 required
                 className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold"
               />
@@ -298,6 +316,8 @@ export default function CheckoutPage() {
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
                 required
                 className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold"
               />
@@ -307,9 +327,11 @@ export default function CheckoutPage() {
           <div className="text-xs">
             <label className="text-muted block mb-1 font-medium">Contact Phone Number</label>
             <input
-              type="text"
+              type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              inputMode="tel"
               required
               className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold"
             />
@@ -320,6 +342,7 @@ export default function CheckoutPage() {
             <textarea
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              autoComplete="street-address"
               required
               className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold h-20"
             />
@@ -365,10 +388,9 @@ export default function CheckoutPage() {
 
           <button
             type="submit"
-            disabled={placingOrder}
-            className="w-full btn-gold py-4 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-2xl disabled:opacity-50"
+            className="w-full btn-gold py-4 rounded-xl text-xs uppercase font-bold tracking-widest flex items-center justify-center gap-2 shadow-2xl"
           >
-            {placingOrder ? 'Processing your order...' : `Complete Order & Pay ${formatPrice(totalINR)}`}
+            Complete Order
           </button>
         </div>
 
@@ -452,6 +474,21 @@ export default function CheckoutPage() {
           </div>
         </div>
       </form>
+
+      {/* Pre-order confirmation popup — Confirm here actually places the order */}
+      {showConfirm && (
+        <ConfirmOrderModal
+          total={totalINR}
+          paymentMethod={paymentMethod}
+          customerName={customerName}
+          address={address}
+          email={customerEmail}
+          placing={placingOrder}
+          formatPrice={formatPrice}
+          onConfirm={placeOrder}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
     </div>
   );
 }

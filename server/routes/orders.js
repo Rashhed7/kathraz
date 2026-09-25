@@ -3,27 +3,39 @@ const crypto = require('crypto');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
 const { sendEmail, orderPlacedEmail, orderStatusEmail } = require('../utils/mailer');
-
-// Fire-and-forget customer email — never blocks or fails the order flow.
-function sendOrderEmail(promise) {
-  promise.catch((err) => console.error('[order-email] failed:', err.message));
-}
+const { buildInvoicePdf } = require('../utils/invoicePdf');
 
 const router = express.Router();
 
-// Lazily-initialized Razorpay client (keys come from .env)
-let razorpayClient = null;
-function getRazorpayClient() {
+// Create a Razorpay order via plain fetch() — works identically on Node and
+// Cloudflare Workers. (The official SDK uses axios over node:http, which is
+// unreliable under the Workers runtime and surfaced as "gateway unavailable".)
+async function createRazorpayOrder({ amount, currency = 'INR', receipt, notes }) {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) {
-    throw new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env');
+    const err = new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
+    err.status = 503;
+    throw err;
   }
-  if (!razorpayClient) {
-    const Razorpay = require('razorpay');
-    razorpayClient = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
+  const res = await fetch('https://api.razorpay.com/v1/orders', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64'),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ amount, currency, receipt, notes })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data?.error?.description || `Razorpay API error (HTTP ${res.status})`);
+    err.status = 502;
+    err.razorpay = data?.error || null;
+    throw err;
   }
-  return razorpayClient;
+  return data;
 }
 
 // Verify the HMAC-SHA256 signature Razorpay returns after checkout
@@ -119,16 +131,16 @@ router.post('/', async (req, res) => {
     let razorpayOrder = null;
     if (isRazorpay) {
       try {
-        razorpayOrder = await getRazorpayClient().orders.create({
+        razorpayOrder = await createRazorpayOrder({
           amount: Math.round(totalAmount * 100), // paise
           currency: 'INR',
           receipt: orderNumber,
           notes: { customer_email, customer_name }
         });
       } catch (rzpError) {
-        console.error('Razorpay order creation failed:', rzpError.error || rzpError);
-        const msg = rzpError?.error?.description || 'Payment gateway is unavailable. Please try again.';
-        return res.status(502).json({ error: msg });
+        console.error('Razorpay order creation failed:', rzpError.razorpay || rzpError.message);
+        const msg = rzpError.razorpay?.description || rzpError.message || 'Payment gateway is unavailable. Please try again.';
+        return res.status(rzpError.status || 502).json({ error: msg });
       }
     }
 
@@ -152,7 +164,9 @@ router.post('/', async (req, res) => {
       discountAmount,
       shippingFee,
       totalAmount,
-      `KEX-${Math.floor(100000 + Math.random() * 900000)}`,
+      // No courier/tracking yet — the admin sets these manually when marking
+      // the order Shipped.
+      null,
       gift_message || ''
     ]);
 
@@ -180,9 +194,25 @@ router.post('/', async (req, res) => {
     const createdOrder = await getQuery('SELECT * FROM orders WHERE id = ?', [orderId]);
     const orderItems = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
 
-    // Order-placed email with itemized invoice summary (async, non-blocking)
-    const { subject, html, text } = orderPlacedEmail({ order: createdOrder, items: orderItems });
-    sendOrderEmail(sendEmail({ to: customer_email, subject, html, text }));
+    // Order-placed email with the itemized tax invoice attached as a PDF.
+    // IMPORTANT: this MUST be awaited. On Cloudflare Workers the isolate is
+    // frozen the moment the response is sent, so fire-and-forget fetches
+    // (like the Brevo call) get killed silently — the email never goes out.
+    // PDF failure degrades to a plain email; email failure never fails the
+    // order (sendEmail catches its own errors and returns false).
+    try {
+      const { subject, html, text } = orderPlacedEmail({ order: createdOrder, items: orderItems });
+      let attachment;
+      try {
+        const pdf = await buildInvoicePdf(createdOrder, orderItems);
+        attachment = { name: `KATHRAZ-Invoice-${createdOrder.order_number}.pdf`, content: pdf };
+      } catch (pdfErr) {
+        console.error('[invoice-pdf] generation failed:', pdfErr.message);
+      }
+      await sendEmail({ to: customer_email, subject, html, text, attachment });
+    } catch (emailErr) {
+      console.error('[order-email] failed:', emailErr.message);
+    }
 
     res.status(201).json({
       message: 'Order created successfully',
@@ -253,7 +283,13 @@ router.post('/verify', async (req, res) => {
         newStatus: 'Confirmed',
         paymentStatus: 'Paid',
       });
-      sendOrderEmail(sendEmail({ to: fullOrder.customer_email, subject, html, text }));
+      // Awaited — see the note in POST / about Workers freezing the isolate
+      // once the response is sent.
+      try {
+        await sendEmail({ to: fullOrder.customer_email, subject, html, text });
+      } catch (emailErr) {
+        console.error('[status-email] failed:', emailErr.message);
+      }
     }
 
     res.json({

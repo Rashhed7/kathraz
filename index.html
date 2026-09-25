@@ -8,12 +8,18 @@
     <link rel="icon" type="image/png" sizes="48x48" href="/images/favicon-48.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/images/favicon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover exposes safe-area insets on notched iPhones/Android cutouts.
+         Pinch-zoom stays enabled on purpose: all inputs are 16px on touch screens
+         (see index.css), which stops iOS from auto-zooming them at focus. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <!-- Primary SEO -->
     <title>Kathraz Fragrances | Extrait de Parfum</title>
-    <meta name="description" content="KATHRAZ crafts luxury Middle Eastern fragrances — aged Cambodian oud, Kannauj attars and classic French perfumery. Extrait de parfum with 12–16+ hour longevity. Free shipping across India over ₹5,000." />
-    <meta name="keywords" content="KATHRAZ, kathraz fragrances, luxury perfume India, oud perfume, attar, extrait de parfum, Kannauj attar, Cambodian oud, middle eastern fragrance, buy perfume online India" />
+    <meta name="description" content="Explore KATHRAZ Fragrances — premium inspired perfumes with distinctive scents crafted for a refined and lasting presence." />
+    <meta name="keywords" content="KATHRAZ, KATHRAZ Fragrances, inspired perfumes, inspired fragrances, premium perfumes, perfumes for men, perfumes for women, Indian perfume brand" />
     <meta name="robots" content="index, follow" />
     <meta name="author" content="KATHRAZ FRAGRANCES INDIA" />
     <meta name="theme-color" content="#0d0b09" />
@@ -24,7 +30,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="KATHRAZ FRAGRANCES INDIA" />
     <meta property="og:title" content="Kathraz Fragrances | Extrait de Parfum" />
-    <meta property="og:description" content="Aged Cambodian oud, Kannauj attars and French perfumery. Extrait de parfum with 12–16+ hour longevity. Free shipping across India over ₹5,000." />
+    <meta property="og:description" content="Explore KATHRAZ Fragrances — premium inspired perfumes with distinctive scents crafted for a refined and lasting presence." />
     <meta property="og:url" content="https://kathraz.store/" />
     <meta property="og:image" content="https://kathraz.store/images/og-image.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -34,7 +40,7 @@
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Kathraz Fragrances | Extrait de Parfum" />
-    <meta name="twitter:description" content="Aged oud, Kannauj attars and French perfumery. Extrait de parfum made in India." />
+    <meta name="twitter:description" content="Discover premium inspired perfumes by KATHRAZ Fragrances. Explore distinctive scents for him and her, with all-India deliver" />
     <meta name="twitter:image" content="https://kathraz.store/images/og-image.jpg" />
 
     <!-- Structured data: helps Google show rich results for the brand -->
@@ -45,7 +51,7 @@
       "name": "KATHRAZ FRAGRANCES INDIA",
       "url": "https://kathraz.store",
       "logo": "https://kathraz.store/images/logo.png",
-      "description": "Luxury Middle Eastern fragrance house — aged oud, Kannauj attars and French perfumery.",
+      "description": "Discover premium inspired perfumes by KATHRAZ Fragrances. Explore distinctive scents for him and her, with all-India delivery.",
       "address": {
         "@type": "PostalAddress",
         "addressCountry": "IN"

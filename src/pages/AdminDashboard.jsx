@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight, Megaphone
+  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight, Megaphone, Truck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import OverlayPortal from '../components/OverlayPortal';
 
 export default function AdminDashboard() {
-  const { user, token, isAdmin } = useAuth();
+  const { user, token, isAdmin, loading: authLoading } = useAuth();
   const { formatPrice } = useCart();
   const navigate = useNavigate();
 
@@ -70,6 +72,10 @@ export default function AdminDashboard() {
 
   // Orders State
   const [orders, setOrders] = useState([]);
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
+
+  // Courier entry popup — opens when the admin marks an order Shipped.
+  const [courierPrompt, setCourierPrompt] = useState(null); // { orderId, trackingNumber }
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Customers State
@@ -108,6 +114,9 @@ export default function AdminDashboard() {
   const [adminError, setAdminError] = useState('');
   const [adminNotice, setAdminNotice] = useState('');
   const [pwModal, setPwModal] = useState(null); // { id, name, password }
+
+  // Freeze page scroll behind the product editor / password dialogs
+  useBodyScrollLock(showProductModal || !!pwModal);
 
   const loadAdmins = async () => {
     try {
@@ -174,12 +183,16 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    // Wait for the session restore (/api/auth/me) to finish first. On a page
+    // refresh `user` is briefly null while the token is still valid — without
+    // this guard the dashboard would bounce to /login before auth restores.
+    if (authLoading) return;
     if (!token || !isAdmin) {
       navigate('/login');
       return;
     }
     loadDashboardData();
-  }, [token, isAdmin]);
+  }, [token, isAdmin, authLoading]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -350,8 +363,23 @@ export default function AdminDashboard() {
     }
   };
 
-  // Update Order Status Transition
+  // Update Order Status Transition.
+  // Optimistic: the select reflects the change immediately; on failure we
+  // revert AND surface the real server error (previously every failure —
+  // 401, 403, 500, network — was swallowed and looked like "nothing happened").
+  // Marking Shipped first opens the courier-entry popup (courier is MANUAL).
   const handleUpdateOrderStatus = async (orderId, newStatus, trackingNumber) => {
+    if (newStatus === 'Shipped') {
+      setCourierPrompt({ orderId, trackingNumber: trackingNumber || '' });
+      return;
+    }
+    await performStatusUpdate(orderId, newStatus, trackingNumber, null);
+  };
+
+  const performStatusUpdate = async (orderId, newStatus, trackingNumber, courierName) => {
+    const prevOrders = orders;
+    setOrders((cur) => cur.map((o) => (o.id === orderId ? { ...o, order_status: newStatus } : o)));
+    setUpdatingOrderId(orderId);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/status`, {
         method: 'PUT',
@@ -361,12 +389,23 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({
           order_status: newStatus,
-          tracking_number: trackingNumber || `KEX-${Math.floor(100000 + Math.random() * 900000)}`
+          ...(courierName ? { courier_name: courierName } : {}),
+          ...(newStatus === 'Shipped' && trackingNumber ? { tracking_number: trackingNumber } : {})
         })
       });
-      if (res.ok) loadDashboardData();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOrders(prevOrders); // revert
+        window.alert(`Status update failed (${res.status}): ${data.error || 'Unknown error'}`);
+        return;
+      }
+      loadDashboardData();
     } catch (e) {
+      setOrders(prevOrders); // revert
       console.error(e);
+      window.alert(`Status update failed: ${e.message}`);
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -406,6 +445,26 @@ export default function AdminDashboard() {
       if (res.ok) loadDashboardData();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Delete Order — removes the order, its items/payment rows and restores stock.
+  const handleDeleteOrder = async (order) => {
+    if (!window.confirm(`Delete order ${order.order_number}?\n\nThis permanently removes the order, its items and payment record, and restores the deducted stock. This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(`Delete failed (${res.status}): ${data.error || 'Unknown error'}`);
+        return;
+      }
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+      window.alert(`Delete failed: ${e.message}`);
     }
   };
 
@@ -772,8 +831,8 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex overflow-x-auto gap-2 border-b border-gold/20 pb-2 text-xs uppercase font-bold tracking-wider">
+      {/* Navigation Tabs — horizontal scroll strip with hidden scrollbar on touch */}
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar flex gap-2 border-b border-gold/20 pb-2 text-xs uppercase font-bold tracking-wider">
         {[
           { id: 'analytics', label: 'Analytics & Sales', icon: BarChart3 },
           { id: 'products', label: `Products (${products.length})`, icon: Package },
@@ -944,6 +1003,7 @@ export default function AdminDashboard() {
                   <th className="py-3 px-4">Amount</th>
                   <th className="py-3 px-4">Status Transition</th>
                   <th className="py-3 px-4">Tracking Code</th>
+                  <th className="py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gold/10">
@@ -971,8 +1031,10 @@ export default function AdminDashboard() {
                     <td className="py-3 px-4">
                       <select
                         value={ord.order_status}
+                        disabled={updatingOrderId === ord.id}
                         onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value, ord.tracking_number)}
-                        className="bg-obsidian border border-gold/30 text-gold text-xs font-bold p-2 rounded focus:outline-none uppercase"
+                        className="bg-obsidian border border-gold/30 text-gold text-xs font-bold p-2 rounded focus:outline-none uppercase disabled:opacity-50"
+                        data-order-id={ord.id}
                       >
                         <option value="Pending">Pending</option>
                         <option value="Confirmed">Confirmed</option>
@@ -983,7 +1045,18 @@ export default function AdminDashboard() {
                       </select>
                     </td>
                     <td className="py-3 px-4 font-num text-xs text-ivory">
-                      {ord.tracking_number}
+                      {ord.tracking_number || '—'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleDeleteOrder(ord)}
+                        disabled={updatingOrderId === ord.id}
+                        title="Delete order (restores stock)"
+                        aria-label={`Delete order ${ord.order_number}`}
+                        className="p-2 text-muted hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1423,8 +1496,9 @@ export default function AdminDashboard() {
 
       {/* Product Add / Edit Modal */}
       {showProductModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-obsidian/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-card border border-gold/40 rounded-2xl p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
+        <OverlayPortal>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-obsidian/90 backdrop-blur-md p-3 sm:p-4 flex">
+          <div className="m-auto w-full max-w-2xl bg-card border border-gold/40 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-6 relative max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto overscroll-contain">
             <div className="flex justify-between items-center border-b border-gold/20 pb-4">
               <h3 className="font-sans text-lg font-bold text-gold">
                 {editingProduct ? 'Edit product' : 'New product'}
@@ -1558,7 +1632,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-2">
                   {variants.map((v, idx) => (
-                    <div key={v.id || `new-${idx}`} className="flex items-center gap-2">
+                    <div key={v.id || `new-${idx}`} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                       <input
                         type="text"
                         value={v.size_label}
@@ -1786,6 +1860,7 @@ export default function AdminDashboard() {
             </form>
           </div>
         </div>
+        </OverlayPortal>
       )}
 
       {/* TAB: ADMINS */}
@@ -1919,8 +1994,9 @@ export default function AdminDashboard() {
 
           {/* Reset password modal */}
           {pwModal && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setPwModal(null)}>
-              <div className="bg-card border border-gold/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <OverlayPortal>
+            <div className="fixed inset-0 bg-black/70 p-3 sm:p-4 flex z-50" onClick={() => setPwModal(null)}>
+              <div className="m-auto bg-card border border-gold/30 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-sans text-base font-bold text-gold">Reset password — {pwModal.name}</h3>
                 <input
                   type="text"
@@ -1950,9 +2026,117 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            </OverlayPortal>
           )}
         </div>
       )}
+      {/* Courier entry popup — required before an order can be marked Shipped */}
+      {courierPrompt && (
+        <CourierModal
+          trackingNumber={courierPrompt.trackingNumber}
+          onCancel={() => setCourierPrompt(null)}
+          onSubmit={async ({ courierName, trackingNumber }) => {
+            const { orderId } = courierPrompt;
+            setCourierPrompt(null);
+            await performStatusUpdate(orderId, 'Shipped', trackingNumber, courierName);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ---------- Courier entry popup (manual, required for Shipped) ---------- */
+
+function CourierModal({ trackingNumber, onSubmit, onCancel }) {
+  const [courierName, setCourierName] = useState('');
+  const [tracking, setTracking] = useState(trackingNumber || '');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!courierName.trim()) return;
+    setBusy(true);
+    await onSubmit({ courierName: courierName.trim(), trackingNumber: tracking.trim() });
+    setBusy(false);
+  };
+
+  return (
+    <OverlayPortal>
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian/80 backdrop-blur-sm animate-fadeIn"
+        onClick={busy ? undefined : onCancel}
+        role="presentation"
+      >
+        <div
+          className="relative w-full max-w-md bg-card border border-gold/30 rounded-2xl shadow-2xl p-7 sm:p-8 animate-popIn"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enter courier details"
+        >
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="absolute top-4 right-4 p-1.5 text-muted hover:text-ivory transition-colors disabled:opacity-50"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="text-center">
+            <div className="mx-auto w-14 h-14 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mb-4">
+              <Truck className="w-7 h-7 text-gold" strokeWidth={1.5} />
+            </div>
+            <h2 className="font-sans text-xl sm:text-2xl font-bold text-ivory">Ship this order</h2>
+            <p className="mt-1.5 text-xs text-muted">
+              Enter the courier service manually — it will be included in the customer's shipped email.
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <div>
+              <label className="text-muted block mb-1 text-xs font-medium">Courier service name *</label>
+              <input
+                type="text"
+                autoFocus
+                value={courierName}
+                onChange={(e) => setCourierName(e.target.value)}
+                placeholder="e.g. Delhivery, BlueDart, DTDC"
+                required
+                className="w-full bg-obsidian border border-gold/30 text-ivory text-sm p-3 rounded-lg focus:outline-none focus:border-gold"
+              />
+            </div>
+            <div>
+              <label className="text-muted block mb-1 text-xs font-medium">Tracking number (optional)</label>
+              <input
+                type="text"
+                value={tracking}
+                onChange={(e) => setTracking(e.target.value)}
+                placeholder="Courier's tracking / AWB number"
+                className="w-full bg-obsidian border border-gold/30 text-ivory text-sm p-3 rounded-lg focus:outline-none focus:border-gold"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={busy}
+                className="py-3.5 rounded-xl text-xs uppercase font-bold tracking-widest border border-gold/30 text-ivory hover:bg-gold/10 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy || !courierName.trim()}
+                className="btn-gold py-3.5 rounded-xl text-xs uppercase font-bold tracking-widest shadow-xl disabled:opacity-50"
+              >
+                {busy ? 'Updating…' : 'Mark Shipped'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </OverlayPortal>
   );
 }

@@ -108,7 +108,7 @@ export default function ContactPage() {
                 <textarea
                   name="message"
                   required
-                  rows="4"
+                  rows={4}
                   placeholder="How can we help?"
                   className="w-full bg-obsidian border border-ivory/15 text-ivory p-3 focus:outline-none focus:border-ivory/40"
                 />
@@ -134,6 +134,7 @@ export default function ContactPage() {
         <Reveal variant="right" delay={120} className="md:col-span-5 space-y-6">
           <div className="bg-card border border-ivory/10 p-6 space-y-4 text-xs">
             <h3 className="font-sans text-lg font-medium text-ivory">Talk to us directly</h3>
+            {/* Each row is a comfortable full-width tap target on phones */}
 
             <a
               href={WHATSAPP_URL}

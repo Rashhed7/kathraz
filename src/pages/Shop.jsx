@@ -114,8 +114,12 @@ export default function Shop() {
 
       {/* Main Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Filters Sidebar */}
-        <aside className={`${showFilters ? 'block' : 'hidden'} lg:block lg:col-span-3 bg-card border border-gold/20 rounded-2xl p-6 space-y-6 glass-panel lg:sticky lg:top-24`}>
+        {/* Filters Sidebar — full-width collapsible panel on mobile, sticky rail on desktop */}
+        <aside
+          className={`${
+            showFilters ? 'block' : 'hidden'
+          } lg:block lg:col-span-3 bg-card border border-gold/20 rounded-2xl px-5 py-5 sm:p-6 space-y-6 glass-panel lg:sticky lg:top-24`}
+        >
           <div className="flex items-center justify-between border-b border-gold/15 pb-4">
             <div className="flex items-center gap-2 font-sans font-bold text-sm text-ivory">
               <SlidersHorizontal className="w-4 h-4 text-ivory" /> Filters
@@ -188,7 +192,7 @@ export default function Shop() {
           </div>
 
           {/* Price Range */}
-          <div className="space-y-2 pt-2 border-t border-gold/15">
+          <div className="space-y-3 pt-2 border-t border-gold/15">
             <div className="flex justify-between text-xs">
               <span className="text-muted font-semibold uppercase">Max Price</span>
               <span className="text-gold font-num font-bold">₹{maxPrice.toLocaleString()}</span>
@@ -200,7 +204,7 @@ export default function Shop() {
               step="1000"
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full accent-gold cursor-pointer"
+              className="w-full accent-gold cursor-pointer h-6 bg-transparent"
             />
           </div>
 
@@ -221,7 +225,7 @@ export default function Shop() {
         {/* Product Grid Area */}
         <main className="lg:col-span-9 space-y-6">
           {/* Top Sort & View Bar */}
-          <div className="bg-card border border-gold/20 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-card border border-gold/20 rounded-xl p-3 sm:p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-muted">
                 Showing <strong className="text-ivory">{displayedProducts.length}</strong> products
@@ -229,7 +233,8 @@ export default function Shop() {
               {/* Mobile: collapsible filters */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`lg:hidden flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                aria-expanded={showFilters}
+                className={`lg:hidden flex items-center gap-1.5 text-xs font-medium px-3.5 py-2.5 rounded-lg border transition-colors ${
                   showFilters || activeFilterCount > 0
                     ? 'bg-gold/20 border-gold/40 text-gold'
                     : 'border-gold/30 text-muted hover:text-ivory'
@@ -241,11 +246,11 @@ export default function Shop() {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Sort By Dropdown */}
+              {/* Sort By Dropdown — native picker on mobile, always full-width thumb-reachable */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2 rounded-lg focus:outline-none focus:border-gold"
+                className="w-full bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2.5 rounded-lg focus:outline-none focus:border-gold"
               >
                 <option value="recommended">Sort by: Featured</option>
                 <option value="price_asc">Price: Low to High</option>

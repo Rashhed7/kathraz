@@ -73,6 +73,8 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              inputMode="email"
               required
               className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold"
             />
@@ -92,9 +94,11 @@ export default function RegisterPage() {
           <div>
             <label className="text-muted block mb-1 font-medium">Phone Number</label>
             <input
-              type="text"
+              type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              inputMode="tel"
               placeholder="+91 98765 43210"
               className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold"
             />
@@ -105,6 +109,7 @@ export default function RegisterPage() {
             <textarea
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              autoComplete="street-address"
               className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold h-16"
             />
           </div>

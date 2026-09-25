@@ -65,6 +65,8 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
                 required
                 className="w-full bg-obsidian border border-gold/30 text-ivory p-3 pl-9 rounded-lg focus:outline-none focus:border-gold"
               />

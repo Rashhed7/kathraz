@@ -39,10 +39,13 @@ export default function GoogleLoginButton({ onError }) {
           }
         },
       });
+      // Width tracks the container (minus padding) instead of a fixed 320px,
+      // so the button never overflows narrow phones (~320px viewports).
+      const width = Math.min(400, Math.max(200, (btnRef.current?.parentElement?.clientWidth || 320) - 2));
       window.google.accounts.id.renderButton(btnRef.current, {
         theme: 'outline',
         size: 'large',
-        width: 320,
+        width,
         text: 'continue_with',
         shape: 'rectangular',
       });
@@ -73,7 +76,7 @@ export default function GoogleLoginButton({ onError }) {
     );
   }
 
-  return <div ref={btnRef} className="flex justify-center" />;
+  return <div ref={btnRef} className="flex justify-center w-full" />;
 }
 
 function GoogleG({ className }) {

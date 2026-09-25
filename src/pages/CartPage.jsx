@@ -69,13 +69,13 @@ export default function CartPage() {
               key={item.variant_id}
               className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-obsidian border border-gold/15"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0">
                 <img
                   src={item.image_url}
                   alt={item.title}
-                  className="w-20 h-20 object-cover rounded-lg border border-gold/20"
+                  className="w-20 h-20 object-cover rounded-lg border border-gold/20 shrink-0"
                 />
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-sans font-bold text-base text-ivory">{item.title}</h3>
                   <span className="text-xs text-gold block">{item.size_label}</span>
                   <span className="text-xs text-muted block mt-1">{formatPrice(item.price)} each</span>
@@ -86,16 +86,18 @@ export default function CartPage() {
                 <div className="flex items-center border border-gold/20 rounded bg-card text-xs">
                   <button
                     onClick={() => updateQuantity(item.variant_id, item.quantity - 1)}
-                    className="px-3 py-1.5 text-ivory hover:text-muted"
+                    className="px-3.5 py-2.5 text-ivory hover:text-muted"
+                    aria-label="Decrease quantity"
                   >
-                    <Minus className="w-3 h-3" />
+                    <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="px-3 font-semibold text-ivory">{item.quantity}</span>
+                  <span className="px-3 font-semibold text-ivory font-num">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.variant_id, item.quantity + 1)}
-                    className="px-3 py-1.5 text-ivory hover:text-muted"
+                    className="px-3.5 py-2.5 text-ivory hover:text-muted"
+                    aria-label="Increase quantity"
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -105,7 +107,8 @@ export default function CartPage() {
 
                 <button
                   onClick={() => removeFromCart(item.variant_id)}
-                  className="text-muted hover:text-ivory p-1"
+                  className="text-muted hover:text-ivory p-2 -mr-1"
+                  aria-label={`Remove ${item.title} from bag`}
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -134,9 +137,10 @@ export default function CartPage() {
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value)}
                   placeholder="Promo Code (e.g. KATHRAZ10)"
-                  className="bg-obsidian border border-gold/30 text-xs text-ivory p-2.5 rounded focus:outline-none focus:border-gold flex-1 uppercase"
+                  autoCapitalize="characters"
+                  className="bg-obsidian border border-gold/30 text-xs text-ivory p-2.5 rounded focus:outline-none focus:border-gold flex-1 min-w-0 uppercase"
                 />
-                <button type="submit" className="btn-outline-gold px-4 text-xs font-bold uppercase rounded">Apply</button>
+                <button type="submit" className="btn-outline-gold px-4 py-2.5 text-xs font-bold uppercase rounded shrink-0">Apply</button>
               </form>
             )}
             {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}

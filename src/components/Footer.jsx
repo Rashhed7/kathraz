@@ -79,12 +79,14 @@ export default function Footer() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email address"
+                  autoComplete="email"
+                  inputMode="email"
                   required
                   className="bg-transparent border border-ivory/20 border-r-0 text-ivory placeholder-muted text-xs px-3 py-2.5 focus:outline-none focus:border-ivory/50 flex-1 min-w-0"
                 />
                 <button
                   type="submit"
-                  className="btn-gold px-5 py-2.5 text-xs uppercase tracking-[0.15em] whitespace-nowrap"
+                  className="btn-gold px-5 py-2.5 text-xs uppercase tracking-[0.15em] whitespace-nowrap shrink-0"
                 >
                   Subscribe
                 </button>

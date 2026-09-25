@@ -11,7 +11,7 @@
 
 const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, attachment }) {
   const apiKey = process.env.BREVO_API_KEY;
   const from = process.env.MAIL_FROM;
 
@@ -21,6 +21,16 @@ async function sendEmail({ to, subject, html, text }) {
   }
 
   try {
+    // Optional PDF attachment: Brevo's v3 API expects base64 content with a
+    // name. Buffer -> base64 works on Node; Workers use the same path.
+    let brevoAttachment;
+    if (attachment && attachment.content && attachment.name) {
+      const base64 = Buffer.isBuffer(attachment.content)
+        ? attachment.content.toString('base64')
+        : Buffer.from(attachment.content).toString('base64');
+      brevoAttachment = [{ name: attachment.name, content: base64 }];
+    }
+
     const res = await fetch(BREVO_API, {
       method: 'POST',
       headers: {
@@ -34,6 +44,7 @@ async function sendEmail({ to, subject, html, text }) {
         subject,
         htmlContent: html,
         textContent: text || undefined,
+        attachment: brevoAttachment,
       }),
     });
 
@@ -108,8 +119,10 @@ function escapeHtml(s) {
 // ---------- Order emails ----------
 
 // Shared email scaffold so all order mails look consistent.
-function orderEmailShell({ title, introHtml, bodyHtml, footerNote }) {
-  return (html) => `
+// Every section is passed explicitly; empty sections are omitted so nothing
+// ever renders as the literal string "undefined".
+function orderEmailShell({ title, introHtml = '', bodyHtml = '', footerNote = '' }) {
+  return `
 <!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#0d0b09;font-family:Georgia,'Times New Roman',serif;">
@@ -120,14 +133,10 @@ function orderEmailShell({ title, introHtml, bodyHtml, footerNote }) {
             <div style="color:#e8c66a;font-size:12px;letter-spacing:3px;text-transform:uppercase;">KATHRAZ</div>
             <div style="color:#f5efe2;font-size:22px;font-weight:bold;margin-top:12px;">${title}</div>
           </td></tr>
-          <tr><td style="padding:16px 32px 0 32px;color:#cfc7b8;font-size:14px;line-height:1.7;">
-            ${introHtml}
-          </td></tr>
-          <tr><td style="padding:8px 32px 0 32px;">
-            ${bodyHtml}
-          </td></tr>
+          ${introHtml ? `<tr><td style="padding:16px 32px 0 32px;color:#cfc7b8;font-size:14px;line-height:1.7;">${introHtml}</td></tr>` : ''}
+          ${bodyHtml ? `<tr><td style="padding:16px 32px 0 32px;">${bodyHtml}</td></tr>` : ''}
           <tr><td style="padding:20px 32px 32px 32px;color:#8d8574;font-size:11px;line-height:1.6;border-top:1px solid #b8963e22;">
-            ${html}
+            ${footerNote}
             <br /><br />© KATHRAZ FRAGRANCES INDIA
           </td></tr>
         </table>
@@ -193,8 +202,6 @@ function statusBadge(status) {
  * @param {object} p  { order, items }
  */
 function orderPlacedEmail({ order, items }) {
-  const shell = orderEmailShell({});
-
   const bodyHtml = `
     ${itemsTable(items)}
     <div style="padding-top:12px;">${totalsBlock(order)}</div>
@@ -202,15 +209,20 @@ function orderPlacedEmail({ order, items }) {
       <tr><td style="padding:12px 16px;color:#8d8574;font-size:11px;line-height:1.8;">
         <div><span style="color:#e8c66a;">Order:</span> ${escapeHtml(order.order_number)}</div>
         <div><span style="color:#e8c66a;">Payment:</span> ${escapeHtml(order.payment_method)} · ${escapeHtml(order.payment_status)}</div>
-        <div><span style="color:#e8c66a;">Tracking:</span> ${escapeHtml(order.courier_name || 'Royal Express Logistics')} · ${escapeHtml(order.tracking_number || '—')}</div>
         <div><span style="color:#e8c66a;">Ship to:</span> ${escapeHtml(order.shipping_address)}</div>
       </td></tr>
     </table>`;
 
-  const html = shell(`
-    Track or manage this order anytime with your order number
-    <strong style="color:#e8c66a;">${escapeHtml(order.order_number)}</strong>
-    on the Track Order page.`);
+  const html = orderEmailShell({
+    title: 'Order confirmed',
+    introHtml: `Hi ${escapeHtml(order.customer_name)}, thank you for your order! Your
+      itemized tax invoice is attached as a PDF. Track or manage this order
+      anytime with your order number
+      <strong style="color:#e8c66a;">${escapeHtml(order.order_number)}</strong>
+      on the Track Order page.`,
+    bodyHtml,
+    footerNote: 'We will email you again when your order status changes.',
+  });
 
   const text =
     `Hi ${order.customer_name},\n\n` +
@@ -220,8 +232,7 @@ function orderPlacedEmail({ order, items }) {
     (Number(order.discount_amount) > 0 ? `Discount: -${formatINR(order.discount_amount)}\n` : '') +
     `Shipping: ${Number(order.shipping_fee) > 0 ? formatINR(order.shipping_fee) : 'FREE'}\n` +
     `Total: ${formatINR(order.total_amount)}\n\n` +
-    `Payment: ${order.payment_method} (${order.payment_status})\n` +
-    `Tracking: ${order.courier_name || 'Royal Express Logistics'} ${order.tracking_number || ''}\n\n` +
+    `Payment: ${order.payment_method} (${order.payment_status})\n\n` +
     `Thank you for shopping with KATHRAZ.`;
 
   return {
@@ -236,11 +247,9 @@ function orderPlacedEmail({ order, items }) {
  * @param {object} p  { order, items, newStatus, paymentStatus, trackingNumber, courierName }
  */
 function orderStatusEmail({ order, items = [], newStatus, paymentStatus, trackingNumber, courierName }) {
-  const shell = orderEmailShell({});
-
   const trackLine =
     trackingNumber || order.tracking_number
-      ? `<div style="margin-top:8px;color:#8d8574;font-size:12px;">Courier: ${escapeHtml(courierName || order.courier_name || 'Royal Express Logistics')} · Tracking: <strong style="color:#e8c66a;">${escapeHtml(trackingNumber || order.tracking_number)}</strong></div>`
+      ? `<div style="margin-top:8px;color:#8d8574;font-size:12px;">Courier: <strong style="color:#e8c66a;">${escapeHtml(courierName || order.courier_name || '—')}</strong> · Tracking: <strong style="color:#e8c66a;">${escapeHtml(trackingNumber || order.tracking_number)}</strong></div>`
       : '';
 
   const bodyHtml =
@@ -248,17 +257,21 @@ function orderStatusEmail({ order, items = [], newStatus, paymentStatus, trackin
       ? `${itemsTable(items, { showTotals: false })}${trackLine}`
       : trackLine;
 
-  const html = shell(
-    `Your order <strong style="color:#e8c66a;">${escapeHtml(order.order_number)}</strong> is now ${statusBadge(newStatus)}.
-     ${paymentStatus ? `<div style="margin-top:8px;color:#8d8574;font-size:12px;">Payment status: ${escapeHtml(paymentStatus)}</div>` : ''}`
-  );
+  const html = orderEmailShell({
+    title: 'Order update',
+    introHtml: `Hi ${escapeHtml(order.customer_name)}, your order
+      <strong style="color:#e8c66a;">${escapeHtml(order.order_number)}</strong> is now ${statusBadge(newStatus)}.
+      ${paymentStatus ? `<div style="margin-top:8px;color:#8d8574;font-size:12px;">Payment status: ${escapeHtml(paymentStatus)}</div>` : ''}`,
+    bodyHtml,
+    footerNote: 'Thank you for shopping with KATHRAZ.',
+  });
 
   const text =
     `Hi ${order.customer_name},\n\n` +
     `Your order ${order.order_number} status: ${newStatus}` +
     (paymentStatus ? `\nPayment: ${paymentStatus}` : '') +
     (trackingNumber || order.tracking_number
-      ? `\nCourier: ${courierName || order.courier_name || 'Royal Express Logistics'} — Tracking: ${trackingNumber || order.tracking_number}`
+      ? `\nCourier: ${courierName || order.courier_name || '—'} — Tracking: ${trackingNumber || order.tracking_number}`
       : '') +
     `\n\nThank you for shopping with KATHRAZ.`;
 

@@ -100,7 +100,7 @@ export default function AdBanner() {
           );
 
           return (
-            <div key={ad.id} className="relative w-full shrink-0 aspect-[21/9] sm:aspect-[2.6/1]">
+            <div key={ad.id} className="relative w-full shrink-0 aspect-[16/9] sm:aspect-[2.6/1]">
               {ad.link_url ? (
                 <a
                   href={ad.link_url}

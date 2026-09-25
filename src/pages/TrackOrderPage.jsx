@@ -65,7 +65,7 @@ export default function TrackOrderPage() {
           e.preventDefault();
           handleTrack();
         }}
-        className="max-w-xl mx-auto flex gap-2"
+        className="max-w-xl mx-auto flex flex-col sm:flex-row gap-2.5 sm:gap-2"
       >
         <div className="relative flex-1">
           <input
@@ -81,7 +81,7 @@ export default function TrackOrderPage() {
         <button
           type="submit"
           disabled={loading}
-          className="btn-gold px-6 py-3.5 rounded-xl text-xs uppercase font-bold tracking-wider flex items-center gap-1 shadow-lg disabled:opacity-50"
+          className="btn-gold sm:w-auto w-full px-6 py-3.5 rounded-xl text-xs uppercase font-bold tracking-wider flex items-center justify-center gap-1 shadow-lg disabled:opacity-50"
         >
           {loading ? 'Searching…' : 'Track'}
         </button>
@@ -102,8 +102,12 @@ export default function TrackOrderPage() {
               <span className="font-num text-xl font-bold text-gold">{order.order_number}</span>
             </div>
             <div className="text-right">
-              <span className="text-xs text-muted block font-num">Courier: {order.courier_name}</span>
-              <span className="font-num text-xs font-bold text-ivory">Tracking ID: {order.tracking_number}</span>
+              {order.courier_name && (
+                <span className="text-xs text-muted block font-num">Courier: {order.courier_name}</span>
+              )}
+              {order.tracking_number && (
+                <span className="font-num text-xs font-bold text-ivory">Tracking ID: {order.tracking_number}</span>
+              )}
             </div>
           </div>
 

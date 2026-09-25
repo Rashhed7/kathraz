@@ -20,15 +20,16 @@ export default function ProductCard({ product, onQuickView }) {
         </span>
       )}
 
-      {/* Wishlist */}
+      {/* Wishlist — generous hit area for thumbs on touch screens */}
       <button
         onClick={() => toggleWishlist(product.id)}
-        className={`absolute top-3 right-3 z-10 p-2 transition-colors ${
+        className={`absolute top-1.5 right-1.5 z-10 p-2.5 transition-colors ${
           isLiked ? 'text-gold' : 'text-ivory/40 hover:text-ivory'
         }`}
+        aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
         title="Add to Wishlist"
       >
-        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+        <Heart className={`w-[18px] h-[18px] ${isLiked ? 'fill-current' : ''}`} />
       </button>
 
       {/* Image */}
@@ -45,7 +46,7 @@ export default function ProductCard({ product, onQuickView }) {
         {onQuickView && (
           <button
             onClick={() => onQuickView(product)}
-            className="absolute inset-x-4 bottom-4 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 bg-obsidian/95 text-ivory text-xs font-medium py-2.5 hover:bg-ivory hover:text-obsidian"
+            className="absolute inset-x-4 bottom-4 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 bg-obsidian/95 text-ivory text-xs font-medium py-3 hover:bg-ivory hover:text-obsidian"
           >
             Quick View
           </button>
@@ -90,7 +91,8 @@ export default function ProductCard({ product, onQuickView }) {
 
           <button
             onClick={() => addToCart(product, defaultVariant, 1)}
-            className="text-[11px] sm:text-xs text-muted hover:text-ivory border border-ivory/15 hover:border-ivory/40 rounded px-2 sm:px-3 py-1.5 transition-colors flex items-center gap-1 sm:gap-1.5 shrink-0"
+            className="text-[11px] sm:text-xs text-muted hover:text-ivory border border-ivory/15 hover:border-ivory/40 rounded px-2.5 sm:px-3 py-2 sm:py-1.5 transition-colors flex items-center gap-1 sm:gap-1.5 shrink-0"
+            aria-label={`Add ${product.title} to bag`}
             title="Add to Bag"
           >
             <ShoppingBag className="w-3.5 h-3.5" /> Add
