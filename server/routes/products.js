@@ -33,8 +33,16 @@ router.get('/', async (req, res) => {
         sql += ` AND p.category_id = ?`;
         params.push(parseInt(category));
       } else {
-        sql += ` AND c.slug = ?`;
-        params.push(category);
+        // Accept a comma-separated list of slugs, so the shop can scope its
+        // default view to several fragrance categories at once.
+        const slugs = String(category).split(',').map((s) => s.trim()).filter(Boolean);
+        if (slugs.length === 1) {
+          sql += ` AND c.slug = ?`;
+          params.push(slugs[0]);
+        } else if (slugs.length > 1) {
+          sql += ` AND c.slug IN (${slugs.map(() => '?').join(', ')})`;
+          params.push(...slugs);
+        }
       }
     }
 
@@ -88,7 +96,8 @@ router.get('/', async (req, res) => {
 
     // Fetch variants and rating summaries for each product
     for (let product of products) {
-      const variants = await allQuery('SELECT * FROM variants WHERE product_id = ? ORDER BY price ASC', [product.id]);
+      // Explicit columns only — never expose the internal cost_price to shoppers.
+      const variants = await allQuery('SELECT id, product_id, size_label, price, sku, stock_quantity FROM variants WHERE product_id = ? ORDER BY price ASC', [product.id]);
       product.variants = variants;
 
       const ratingSummary = await getQuery('SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews WHERE product_id = ?', [product.id]);
@@ -139,7 +148,8 @@ router.get('/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Fragrance not found' });
     }
 
-    const variants = await allQuery('SELECT * FROM variants WHERE product_id = ? ORDER BY price ASC', [product.id]);
+    // Explicit columns only — never expose the internal cost_price to shoppers.
+    const variants = await allQuery('SELECT id, product_id, size_label, price, sku, stock_quantity FROM variants WHERE product_id = ? ORDER BY price ASC', [product.id]);
     product.variants = variants;
 
     const reviews = await allQuery('SELECT * FROM reviews WHERE product_id = ? ORDER BY id DESC', [product.id]);

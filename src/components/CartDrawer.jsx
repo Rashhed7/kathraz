@@ -16,8 +16,9 @@ export default function CartDrawer() {
     shippingINR,
     totalINR,
     formatPrice,
-    appliedCoupon,
-    setAppliedCoupon,
+    appliedCoupons,
+    addCoupon,
+    removeCoupon,
     giftMessage,
     setGiftMessage
   } = useCart();
@@ -42,11 +43,15 @@ export default function CartDrawer() {
       const res = await fetch('/api/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode, subtotal: subtotalINR })
+        body: JSON.stringify({
+          code: couponCode,
+          subtotal: subtotalINR,
+          applied_codes: appliedCoupons.map((c) => c.code)
+        })
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setAppliedCoupon(data.coupon);
+        addCoupon(data.coupon);
         setCouponSuccess(`Coupon ${data.coupon.code} applied! Saved ${formatPrice(data.coupon.discount_amount)}`);
         setCouponCode('');
       } else {
@@ -175,35 +180,43 @@ export default function CartDrawer() {
             <div className="px-5 sm:px-6 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-gold/15 bg-obsidian space-y-4">
               {/* Promo Code & Gift Note Toggles */}
               <div className="space-y-2">
-                {appliedCoupon ? (
-                  <div className="flex items-center justify-between p-2 rounded bg-gold/10 border border-gold/30 text-xs text-gold">
+                {appliedCoupons.map((c) => (
+                  <div
+                    key={c.code}
+                    className="flex items-center justify-between p-2 rounded bg-gold/10 border border-gold/30 text-xs text-gold"
+                  >
                     <span className="flex items-center gap-1 font-semibold">
-                      <Tag className="w-3.5 h-3.5" /> {appliedCoupon.code} Applied
+                      <Tag className="w-3.5 h-3.5" /> {c.code} applied
+                      <span className="text-ivory/70 font-normal">
+                        {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                      </span>
                     </span>
                     <button
-                      onClick={() => setAppliedCoupon(null)}
+                      type="button"
+                      onClick={() => removeCoupon(c.code)}
                       className="text-xs underline text-ivory hover:text-muted"
                     >
                       Remove
                     </button>
                   </div>
-                ) : (
-                  <form onSubmit={handleApplyCoupon} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder="Promo Code (e.g. KATHRAZ10)"
-                      className="bg-card border border-gold/20 text-xs text-ivory px-3 py-2 rounded focus:outline-none focus:border-gold flex-1 uppercase tracking-wider"
-                    />
-                    <button
-                      type="submit"
-                      className="btn-outline-gold px-3 py-2 text-xs font-semibold uppercase rounded"
-                    >
-                      Apply
-                    </button>
-                  </form>
-                )}
+                ))}
+
+                {/* Always shown, so more codes can be stacked on top */}
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder={appliedCoupons.length > 0 ? 'Add another code' : 'Promo Code (e.g. KATHRAZ10)'}
+                    className="bg-card border border-gold/20 text-xs text-ivory px-3 py-2 rounded focus:outline-none focus:border-gold flex-1 uppercase tracking-wider"
+                  />
+                  <button
+                    type="submit"
+                    className="btn-outline-gold px-3 py-2 text-xs font-semibold uppercase rounded"
+                  >
+                    Apply
+                  </button>
+                </form>
                 {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}
                 {couponSuccess && <p className="text-[11px] text-gold">{couponSuccess}</p>}
 

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+# Local data backups (order exports contain customer PII)
+backups/
 server/kathraz_database.sqlite
 tail.log
 tail-log.txt

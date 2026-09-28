@@ -9,15 +9,40 @@
 // If either is missing, sendEmail() fails soft: logs and returns false, so
 // features like forgot-password can degrade gracefully.
 
+const { allQuery } = require('../database');
+
 const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 
-async function sendEmail({ to, subject, html, text, attachment }) {
+// Sends through Brevo and returns the full delivery detail rather than a bare
+// boolean, so the admin "test email" check can surface the real provider
+// response instead of failing silently.
+async function sendEmailWithResult({ to, subject, html, text, attachment }) {
   const apiKey = process.env.BREVO_API_KEY;
   const from = process.env.MAIL_FROM;
 
+  // `to` accepts a single address or a list (e.g. several store admins).
+  const recipients = (Array.isArray(to) ? to : [to])
+    .filter((email) => typeof email === 'string' && email.trim() !== '')
+    .map((email) => email.trim());
+
+  const result = {
+    ok: false,
+    status: null,
+    providerMessage: '',
+    recipients,
+    sender: from || null,
+    configured: Boolean(apiKey && from),
+  };
+
   if (!apiKey || !from) {
-    console.warn('[mailer] BREVO_API_KEY / MAIL_FROM not set — skipping email to', to);
-    return false;
+    console.warn('[mailer] BREVO_API_KEY / MAIL_FROM not set — skipping email to', recipients.join(', '));
+    result.providerMessage = 'BREVO_API_KEY or MAIL_FROM is not set on the server.';
+    return result;
+  }
+  if (recipients.length === 0) {
+    console.warn('[mailer] no recipients supplied — skipping email');
+    result.providerMessage = 'No recipient address is configured.';
+    return result;
   }
 
   try {
@@ -40,7 +65,7 @@ async function sendEmail({ to, subject, html, text, attachment }) {
       },
       body: JSON.stringify({
         sender: { email: from, name: 'KATHRAZ Fragrances' },
-        to: [{ email: to }],
+        to: recipients.map((email) => ({ email })),
         subject,
         htmlContent: html,
         textContent: text || undefined,
@@ -48,16 +73,46 @@ async function sendEmail({ to, subject, html, text, attachment }) {
       }),
     });
 
+    result.status = res.status;
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error('[mailer] Brevo error', res.status, body.slice(0, 300));
-      return false;
+      result.providerMessage = body.slice(0, 300);
+      console.error('[mailer] Brevo error', res.status, result.providerMessage);
+      return result;
     }
-    return true;
+
+    const accepted = await res.json().catch(() => ({}));
+    result.ok = true;
+    result.providerMessage = accepted && accepted.messageId
+      ? `accepted by Brevo (messageId ${accepted.messageId})`
+      : 'accepted by Brevo';
+    return result;
   } catch (err) {
     console.error('[mailer] send failed:', err.message);
-    return false;
+    result.providerMessage = err.message;
+    return result;
   }
+}
+
+// Boolean wrapper kept for existing callers.
+async function sendEmail(params) {
+  const result = await sendEmailWithResult(params);
+  return result.ok;
+}
+
+// Who receives internal alerts (new orders, test sends).
+// An explicit ADMIN_NOTIFICATION_EMAIL wins — comma-separate it for several
+// inboxes. Otherwise every distinct admin account is notified, so an alert is
+// never silently lost to an unmonitored address.
+async function resolveAlertRecipients() {
+  const configured = String(process.env.ADMIN_NOTIFICATION_EMAIL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (configured.length > 0) return configured;
+
+  const admins = await allQuery("SELECT DISTINCT email FROM users WHERE role = 'admin'");
+  return admins.map((a) => a.email).filter(Boolean);
 }
 
 // Branded password-reset email.
@@ -243,6 +298,63 @@ function orderPlacedEmail({ order, items }) {
 }
 
 /**
+ * Internal alert to the store owner when a new order lands.
+ * Deliberately separate from the customer email so a failure in one can never
+ * affect the other.
+ * @param {object} p  { order, items, adminUrl }
+ */
+function newOrderAlertEmail({ order, items, adminUrl }) {
+  const bodyHtml = `
+    ${itemsTable(items)}
+    <div style="padding-top:12px;">${totalsBlock(order)}</div>
+    <table role="presentation" width="100%" style="margin-top:16px;background:#171310;border-radius:10px;border:1px solid #b8963e22;">
+      <tr><td style="padding:12px 16px;color:#8d8574;font-size:11px;line-height:1.8;">
+        <div><span style="color:#e8c66a;">Order:</span> ${escapeHtml(order.order_number)}</div>
+        <div><span style="color:#e8c66a;">Customer:</span> ${escapeHtml(order.customer_name)}</div>
+        <div><span style="color:#e8c66a;">Phone:</span> ${escapeHtml(order.phone)}</div>
+        <div><span style="color:#e8c66a;">Email:</span> ${escapeHtml(order.customer_email)}</div>
+        <div><span style="color:#e8c66a;">Payment:</span> ${escapeHtml(order.payment_method)} · ${escapeHtml(order.payment_status)}</div>
+        <div><span style="color:#e8c66a;">Ship to:</span> ${escapeHtml(order.shipping_address)}</div>
+      </td></tr>
+    </table>
+    ${
+      adminUrl
+        ? `<table role="presentation" width="100%"><tr><td align="center" style="padding:20px 0 0 0;">
+            <a href="${adminUrl}" style="display:inline-block;background:#e8c66a;color:#171310;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;text-decoration:none;padding:14px 36px;border-radius:999px;">Open admin dashboard</a>
+          </td></tr></table>`
+        : ''
+    }`;
+
+  const html = orderEmailShell({
+    title: 'New order received',
+    introHtml: `You have a new order from <strong style="color:#e8c66a;">${escapeHtml(order.customer_name)}</strong> for
+      <strong style="color:#e8c66a;">${formatINR(order.total_amount)}</strong>.`,
+    bodyHtml,
+    footerNote: 'Sent to the store owner because a new order was placed.',
+  });
+
+  const text =
+    `NEW ORDER ${order.order_number}\n\n` +
+    `Customer: ${order.customer_name}\n` +
+    `Phone: ${order.phone}\n` +
+    `Email: ${order.customer_email}\n` +
+    `Payment: ${order.payment_method} (${order.payment_status})\n` +
+    `Ship to: ${order.shipping_address}\n\n` +
+    (items || []).map((i) => `- ${i.product_title} (${i.size_label}) x${i.quantity} - ${formatINR(i.total)}`).join('\n') +
+    `\n\nSubtotal: ${formatINR(order.subtotal)}\n` +
+    (Number(order.discount_amount) > 0 ? `Discount: -${formatINR(order.discount_amount)}\n` : '') +
+    `Shipping: ${Number(order.shipping_fee) > 0 ? formatINR(order.shipping_fee) : 'FREE'}\n` +
+    `Total: ${formatINR(order.total_amount)}\n` +
+    (adminUrl ? `\nManage: ${adminUrl}\n` : '');
+
+  return {
+    subject: `New order ${order.order_number} · ${formatINR(order.total_amount)} — KATHRAZ`,
+    html,
+    text,
+  };
+}
+
+/**
  * Order status update email (any status change incl. payment updates).
  * @param {object} p  { order, items, newStatus, paymentStatus, trackingNumber, courierName }
  */
@@ -284,7 +396,10 @@ function orderStatusEmail({ order, items = [], newStatus, paymentStatus, trackin
 
 module.exports = {
   sendEmail,
+  sendEmailWithResult,
+  resolveAlertRecipients,
   passwordResetEmail,
   orderPlacedEmail,
   orderStatusEmail,
+  newOrderAlertEmail,
 };

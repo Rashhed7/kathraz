@@ -6,6 +6,12 @@ import Reveal from '../components/Reveal';
 import QuickViewModal from '../components/QuickViewModal';
 import { useWishlist } from '../context/WishlistContext';
 
+// The shop's default view (no ?category=) is the fragrance range, so non-perfume
+// products never sit under an "All Fragrances" heading. If you open more
+// fragrance categories later, add their slugs here — they join "All Fragrances"
+// and drop out of the sidebar list (which shows the other ranges).
+const FRAGRANCE_CATEGORY_SLUGS = ['personal-fragrances'];
+
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
@@ -34,6 +40,15 @@ export default function Shop() {
   ].filter(Boolean).length;
 
   const { wishlist } = useWishlist();
+
+  // Which categories count as "fragrances" right now. If the admin renames or
+  // deletes the configured category, fall back to the unfiltered listing
+  // (headed "All Products") instead of rendering an empty shop.
+  const activeFragranceSlugs = categories.length === 0
+    ? FRAGRANCE_CATEGORY_SLUGS
+    : FRAGRANCE_CATEGORY_SLUGS.filter((s) => categories.some((c) => c.slug === s));
+  const effectiveCategory = selectedCategory || activeFragranceSlugs.join(',');
+  const isFragranceView = !selectedCategory && activeFragranceSlugs.length > 0;
 
   useEffect(() => {
     fetchCategories();
@@ -65,7 +80,7 @@ export default function Shop() {
     setLoading(true);
     try {
       let url = `/api/products?maxPrice=${maxPrice}&sort=${sortBy}`;
-      if (selectedCategory) url += `&category=${selectedCategory}`;
+      if (effectiveCategory) url += `&category=${encodeURIComponent(effectiveCategory)}`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
       if (selectedGender) url += `&gender=${selectedGender}`;
       if (selectedConcentration) url += `&concentration=${encodeURIComponent(selectedConcentration)}`;
@@ -98,18 +113,24 @@ export default function Shop() {
     : products;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 lg:pb-10 space-y-8">
-      {/* Header Banner — compact */}
-      <div className="relative rounded-2xl bg-card border border-gold/20 px-6 py-5 overflow-hidden glass-panel">
-        <div className="relative z-10 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="font-sans text-xl sm:text-2xl font-bold text-ivory">
-            {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name || 'Collection' : 'All Fragrances'}
-          </h1>
-          <span className="text-[11px] uppercase tracking-[0.25em] text-muted font-semibold">KATHRAZ</span>
-          <p className="w-full text-xs text-muted font-light">
-            Extrait de parfums and attar oils, blended and bottled in small batches.
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-10 space-y-6">
+      {/* Page title — deliberately one line. The old banner card pushed the
+          whole product grid below the fold, so the copy moved into the filter
+          sidebar and the result count moved up here. */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="font-sans text-xl sm:text-2xl font-bold text-ivory">
+          {selectedCategory
+            ? categories.find(c => c.slug === selectedCategory)?.name || 'Collection'
+            : isFragranceView ? 'All Fragrances' : 'All Products'}
+        </h1>
+        <span className="text-xs text-muted font-num">
+          {loading
+            ? 'Loading…'
+            : `${displayedProducts.length} ${displayedProducts.length === 1 ? 'product' : 'products'}`}
+        </span>
+        {showWishlistOnly && (
+          <span className="text-[10px] uppercase tracking-wider text-gold font-semibold">Wishlist</span>
+        )}
       </div>
 
       {/* Main Layout */}
@@ -157,19 +178,21 @@ export default function Shop() {
                   selectedCategory === '' ? 'bg-gold/20 text-gold border border-gold/30' : 'text-ivory/80 hover:bg-gold/10'
                 }`}
               >
-                All Collections
+                {isFragranceView ? 'All Fragrances' : 'All Products'}
               </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.slug)}
-                  className={`w-full text-left px-3 py-2 rounded-lg font-medium transition-colors ${
-                    selectedCategory === cat.slug ? 'bg-gold/20 text-gold border border-gold/30' : 'text-ivory/80 hover:bg-gold/10'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
+              {categories
+                .filter((cat) => !activeFragranceSlugs.includes(cat.slug))
+                .map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.slug)}
+                    className={`w-full text-left px-3 py-2 rounded-lg font-medium transition-colors ${
+                      selectedCategory === cat.slug ? 'bg-gold/20 text-gold border border-gold/30' : 'text-ivory/80 hover:bg-gold/10'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -220,44 +243,44 @@ export default function Shop() {
               {showWishlistOnly ? 'Showing Wishlist Only' : `Wishlist Saved (${wishlist.length})`}
             </button>
           </div>
+
+          {/* Brand note — relocated from the old page banner so it stays on the
+              page without competing with the products for the top of the screen */}
+          <p className="pt-1 text-[10px] leading-relaxed text-muted font-light">
+            Extrait de parfums and attar oils, blended and bottled in small batches.
+          </p>
         </aside>
 
         {/* Product Grid Area */}
         <main className="lg:col-span-9 space-y-6">
-          {/* Top Sort & View Bar */}
-          <div className="bg-card border border-gold/20 rounded-xl p-3 sm:p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-muted">
-                Showing <strong className="text-ivory">{displayedProducts.length}</strong> products
-              </span>
-              {/* Mobile: collapsible filters */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                aria-expanded={showFilters}
-                className={`lg:hidden flex items-center gap-1.5 text-xs font-medium px-3.5 py-2.5 rounded-lg border transition-colors ${
-                  showFilters || activeFilterCount > 0
-                    ? 'bg-gold/20 border-gold/40 text-gold'
-                    : 'border-gold/30 text-muted hover:text-ivory'
-                }`}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </button>
-            </div>
+          {/* Toolbar — a single row. The product count moved up into the page
+              title, so this no longer stacks two rows above the grid. */}
+          <div className="bg-card border border-gold/20 rounded-xl p-3 sm:p-4 flex items-center gap-3">
+            {/* Mobile: collapsible filters */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              aria-expanded={showFilters}
+              className={`lg:hidden shrink-0 flex items-center gap-1.5 text-xs font-medium px-3.5 py-2.5 rounded-lg border transition-colors ${
+                showFilters || activeFilterCount > 0
+                  ? 'bg-gold/20 border-gold/40 text-gold'
+                  : 'border-gold/30 text-muted hover:text-ivory'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </button>
 
-            <div className="flex items-center gap-4">
-              {/* Sort By Dropdown — native picker on mobile, always full-width thumb-reachable */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2.5 rounded-lg focus:outline-none focus:border-gold"
-              >
-                <option value="recommended">Sort by: Featured</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="newest">Newest Additions</option>
-              </select>
-            </div>
+            {/* Sort By Dropdown — native picker on mobile, thumb-reachable */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="flex-1 bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2.5 rounded-lg focus:outline-none focus:border-gold"
+            >
+              <option value="recommended">Sort by: Featured</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="newest">Newest Additions</option>
+            </select>
           </div>
 
           {/* Products Loading / Empty State */}

@@ -21,6 +21,12 @@ export default function ProductDetail() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
+  // Fragrance sections only exist for products that actually have them — a
+  // candle or gift set shouldn't show empty "Top Notes" / "Longevity" panels.
+  const hasNotes = !!(product && (product.top_notes || product.heart_notes || product.base_notes));
+  const showNotes = hasNotes && activeTab === 'notes';
+  const showReviews = !showNotes;
+
   const { formatPrice, addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
@@ -111,9 +117,11 @@ export default function ProductDetail() {
               alt={product.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
-            <span className="absolute top-4 left-4 bg-gold/90 text-charcoal text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded shadow">
-              {product.concentration}
-            </span>
+            {product.concentration && (
+              <span className="absolute top-4 left-4 bg-gold/90 text-charcoal text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded shadow">
+                {product.concentration}
+              </span>
+            )}
           </div>
 
           {/* Gallery Thumbnails */}
@@ -138,7 +146,10 @@ export default function ProductDetail() {
         <Reveal variant="right" delay={120} className="lg:col-span-6 space-y-6">
           <div>
             <div className="flex items-center justify-between gap-2 text-xs text-gold uppercase tracking-widest font-semibold flex-wrap">
-              <span>{product.category_name} · {product.gender}</span>
+              <span>
+                {product.category_name}
+                {product.gender ? ` · ${product.gender}` : ''}
+              </span>
               <span className="text-ivory flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" /> In stock
               </span>
@@ -206,28 +217,34 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* Longevity & Sillage Meter */}
-          <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-obsidian border border-gold/15 text-xs">
-            <div className="space-y-1">
-              <span className="text-muted uppercase tracking-wider flex items-center gap-1 text-[10px]">
-                <Clock className="w-3.5 h-3.5 text-gold" /> Longevity
-              </span>
-              <div className="font-semibold text-ivory">{product.longevity || '16+ Hours'}</div>
-              <div className="w-full bg-card rounded-full h-1 border border-gold/20">
-                <div className="bg-gold h-full rounded-full w-[95%]"></div>
-              </div>
-            </div>
+          {/* Longevity & Sillage — only shown when the product actually has them */}
+          {(product.longevity || product.sillage) && (
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-obsidian border border-gold/15 text-xs">
+              {product.longevity && (
+                <div className="space-y-1">
+                  <span className="text-muted uppercase tracking-wider flex items-center gap-1 text-[10px]">
+                    <Clock className="w-3.5 h-3.5 text-gold" /> Longevity
+                  </span>
+                  <div className="font-semibold text-ivory">{product.longevity}</div>
+                  <div className="w-full bg-card rounded-full h-1 border border-gold/20">
+                    <div className="bg-gold h-full rounded-full w-[95%]"></div>
+                  </div>
+                </div>
+              )}
 
-            <div className="space-y-1">
-              <span className="text-muted uppercase tracking-wider flex items-center gap-1 text-[10px]">
-                <Flame className="w-3.5 h-3.5 text-gold" /> Sillage Profile
-              </span>
-              <div className="font-semibold text-ivory">{product.sillage || 'Enormous / Room-filling'}</div>
-              <div className="w-full bg-card rounded-full h-1 border border-gold/20">
-                <div className="bg-gold h-full rounded-full w-[90%]"></div>
-              </div>
+              {product.sillage && (
+                <div className="space-y-1">
+                  <span className="text-muted uppercase tracking-wider flex items-center gap-1 text-[10px]">
+                    <Flame className="w-3.5 h-3.5 text-gold" /> Sillage Profile
+                  </span>
+                  <div className="font-semibold text-ivory">{product.sillage}</div>
+                  <div className="w-full bg-card rounded-full h-1 border border-gold/20">
+                    <div className="bg-gold h-full rounded-full w-[90%]"></div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Action CTAs (desktop) — on phones this row is replaced by the
               fixed bottom bar rendered at the end of the page */}
@@ -266,18 +283,20 @@ export default function ProductDetail() {
       {/* Tabs: Notes / Reviews */}
       <div className="space-y-8 border-t border-gold/15 pt-12">
         <div className="flex flex-wrap border-b border-gold/20 gap-4 sm:gap-8 text-xs sm:text-sm font-sans tracking-wider uppercase font-semibold">
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`pb-3 border-b-2 transition-all ${
-              activeTab === 'notes' ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
-            }`}
-          >
-            Fragrance notes
-          </button>
+          {hasNotes && (
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`pb-3 border-b-2 transition-all ${
+                showNotes ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
+              }`}
+            >
+              Fragrance notes
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('reviews')}
             className={`pb-3 border-b-2 transition-all ${
-              activeTab === 'reviews' ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
+              showReviews ? 'border-gold text-gold' : 'border-transparent text-muted hover:text-ivory'
             }`}
           >
             Reviews ({product.reviews ? product.reviews.length : 0})
@@ -285,7 +304,7 @@ export default function ProductDetail() {
         </div>
 
         {/* Tab 1: Notes */}
-        {activeTab === 'notes' && (
+        {showNotes && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-2">
               <span className="text-xs uppercase text-gold font-bold tracking-wider block">Top Notes (Opening)</span>
@@ -314,7 +333,7 @@ export default function ProductDetail() {
         )}
 
         {/* Tab 2: Reviews */}
-        {activeTab === 'reviews' && (
+        {showReviews && (
           <div className="space-y-8 animate-fadeIn">
             {/* Submit Review */}
             <div className="bg-card border border-gold/20 p-6 rounded-2xl space-y-4">
@@ -355,7 +374,7 @@ export default function ProductDetail() {
                     <textarea
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="Describe the sillage, longevity, and note evolution..."
+                      placeholder="Share your experience with this product..."
                       required
                       className="w-full bg-obsidian border border-gold/30 text-ivory p-3 rounded-lg focus:outline-none focus:border-gold h-24"
                     />

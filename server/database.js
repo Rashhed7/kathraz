@@ -188,6 +188,12 @@ async function initDatabase() {
     )
   `);
 
+  // Cost/making price per size, used for Cost of Goods (COGS) and profit
+  // reporting. Added post-launch, hence the ALTER for older installs.
+  await runQuery(`
+    ALTER TABLE variants ADD COLUMN IF NOT EXISTS cost_price REAL DEFAULT 0
+  `);
+
   // Inventory Table
   await runQuery(`
     CREATE TABLE IF NOT EXISTS inventory (
@@ -250,6 +256,27 @@ async function initDatabase() {
       price REAL NOT NULL,
       quantity INTEGER NOT NULL,
       total REAL NOT NULL
+    )
+  `);
+
+  // Cost of the variant AT THE TIME OF SALE. Snapshotted so changing a
+  // product's cost price later never rewrites historical profit.
+  await runQuery(`
+    ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost_price REAL DEFAULT 0
+  `);
+
+  // Business Expenses — rent, ads, packaging, salaries … Everything the admin
+  // spends to run the store. Subtracted from gross profit to get net profit.
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT DEFAULT 'General',
+      amount REAL NOT NULL,
+      expense_date DATE DEFAULT CURRENT_DATE,
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
 

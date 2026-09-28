@@ -40,7 +40,15 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 npx wrangler secret put RAZORPAY_KEY_ID
 npx wrangler secret put RAZORPAY_KEY_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put BREVO_API_KEY
+npx wrangler secret put MAIL_FROM
 ```
+> ℹ️ **New-order alerts.** Set `ADMIN_NOTIFICATION_EMAIL` to the inbox that should
+> receive an email every time an order is placed. Comma-separate it to notify
+> several addresses. If it isn't set, every distinct admin account is notified.
+> ```bash
+> npx wrangler secret put ADMIN_NOTIFICATION_EMAIL
+> ```
 > ⚠️ Use the **session-pooler** DATABASE_URL (port 5432) — it works from any IP.
 > The direct connection (port 5432 restricted to your IP) would fail on Cloudflare.
 

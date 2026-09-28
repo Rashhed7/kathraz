@@ -1,12 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight, Megaphone, Truck
+  Shield, BarChart3, Package, ShoppingBag, Users, Tag, Inbox, Mail, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, Search, RefreshCw, X, ArrowUpRight, Printer, Instagram, ArrowLeft, ArrowRight,  Megaphone, Truck, Receipt, FolderTree
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import OverlayPortal from '../components/OverlayPortal';
+
+// Remembers the newest order the admin has acknowledged, so the "new orders"
+// badge survives a page reload.
+const SEEN_ORDERS_KEY = 'kathraz_admin_seen_order_id';
+
+// Categories offered when logging an expense (free text is still accepted).
+const EXPENSE_CATEGORIES = [
+  'General', 'Purchase / Stock', 'Marketing & Ads', 'Packaging',
+  'Shipping', 'Rent', 'Salaries', 'Utilities', 'Other',
+];
 
 export default function AdminDashboard() {
   const { user, token, isAdmin, loading: authLoading } = useAuth();
@@ -32,6 +42,15 @@ export default function AdminDashboard() {
 
   // Products State
   const [products, setProducts] = useState([]);
+
+  // Categories State — the store's collections. Admins create these, so
+  // non-fragrance ranges can be listed alongside perfume.
+  const [categories, setCategories] = useState([]);
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editCategoryForm, setEditCategoryForm] = useState({ name: '', description: '' });
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -47,13 +66,15 @@ export default function AdminDashboard() {
     category_id: 1,
     base_price: 9800,
     sale_price: '',
-    gender: 'Unisex',
-    concentration: 'Extrait de Parfum',
-    top_notes: 'Wild Bergamot, Saffron',
-    heart_notes: 'Damask Rose, Aged Oud',
-    base_notes: 'Amber, Musk',
-    longevity: '16+ Hours',
-    sillage: 'Enormous',
+    // Fragrance fields default to blank so a non-perfume item is never created
+    // with misleading perfume values — fill them in for fragrances.
+    gender: '',
+    concentration: '',
+    top_notes: '',
+    heart_notes: '',
+    base_notes: '',
+    longevity: '',
+    sillage: '',
     image_url: '/images/oud_royal.jpg',
     is_featured: true,
     is_bestseller: false
@@ -66,13 +87,28 @@ export default function AdminDashboard() {
   const [gallery, setGallery] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  // Sizes & Pricing (variants) editor state
-  const emptyVariant = () => ({ id: null, size_label: '', price: '', stock_quantity: '' });
+  // Sizes & Pricing (variants) editor state.
+  // cost_price is the internal making/purchase cost per unit — it feeds the
+  // profit report and is never exposed to customers.
+  const emptyVariant = () => ({ id: null, size_label: '', price: '', stock_quantity: '', cost_price: '' });
   const [variants, setVariants] = useState([]);
 
   // Orders State
   const [orders, setOrders] = useState([]);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
+
+  // Email health check (Orders tab) — proves whether alerts can actually send
+  const [testEmailBusy, setTestEmailBusy] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState(null);
+
+  // New-order alerting. null means "not initialised yet" — a first-ever visit
+  // adopts the current newest order instead of flagging the whole history.
+  const [seenOrderId, setSeenOrderId] = useState(() => {
+    const raw = Number(window.localStorage.getItem(SEEN_ORDERS_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  });
+  const audioCtxRef = useRef(null);
+  const lastChimedOrderIdRef = useRef(0);
 
   // Courier entry popup — opens when the admin marks an order Shipped.
   const [courierPrompt, setCourierPrompt] = useState(null); // { orderId, trackingNumber }
@@ -83,6 +119,18 @@ export default function AdminDashboard() {
 
   // Coupons State
   const [coupons, setCoupons] = useState([]);
+
+  // Expenses State — running costs the admin logs (rent, ads, packaging…).
+  // These come off gross profit to give the real net profit.
+  const [expenses, setExpenses] = useState([]);
+  const [expenseForm, setExpenseForm] = useState({ title: '', category: 'General', amount: '', expense_date: '', notes: '' });
+  const [expenseBusy, setExpenseBusy] = useState(false);
+  const [expenseError, setExpenseError] = useState('');
+  // Inline row editing — one expense at a time
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [editExpenseForm, setEditExpenseForm] = useState({ title: '', category: 'General', amount: '', expense_date: '', notes: '' });
+  const [editExpenseBusy, setEditExpenseBusy] = useState(false);
+  const [editExpenseError, setEditExpenseError] = useState('');
 
   // Contact Inquiries State (customer messages from Contact page)
   const [inquiries, setInquiries] = useState([]);
@@ -208,8 +256,11 @@ export default function AdminDashboard() {
         setCategorySales(data.categorySales || []);
       }
 
-      // 2. Fetch Products
-      const resProducts = await fetch('/api/products');
+      // 2. Fetch Products — admin endpoint, so each size carries its cost price
+      // (the public /api/products deliberately withholds it).
+      const resProducts = await fetch('/api/admin/products', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (resProducts.ok) {
         const data = await resProducts.json();
         setProducts(data.products || []);
@@ -268,6 +319,24 @@ export default function AdminDashboard() {
         const data = await resAds.json();
         setAdBanners(data.ads || []);
       }
+
+      // 9. Fetch logged expenses
+      const resExpenses = await fetch('/api/admin/expenses', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resExpenses.ok) {
+        const data = await resExpenses.json();
+        setExpenses(data.expenses || []);
+      }
+
+      // 10. Fetch categories (with product counts)
+      const resCategories = await fetch('/api/admin/categories', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resCategories.ok) {
+        const data = await resCategories.json();
+        setCategories(data.categories || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -313,7 +382,8 @@ export default function AdminDashboard() {
             id: v.id || undefined,
             size_label: v.size_label,
             price,
-            stock_quantity: v.stock_quantity === '' ? 0 : Number(v.stock_quantity)
+            stock_quantity: v.stock_quantity === '' ? 0 : Number(v.stock_quantity),
+            cost_price: v.cost_price === '' || v.cost_price == null ? 0 : Number(v.cost_price)
           };
         })
       };
@@ -447,6 +517,286 @@ export default function AdminDashboard() {
       console.error(e);
     }
   };
+
+  // Log a business expense (rent, ads, packaging, stock purchases…)
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    setExpenseError('');
+    setExpenseBusy(true);
+    try {
+      const res = await fetch('/api/admin/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...expenseForm, amount: Number(expenseForm.amount) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to add expense');
+      setExpenseForm({ title: '', category: 'General', amount: '', expense_date: '', notes: '' });
+      loadDashboardData();
+    } catch (err) {
+      setExpenseError(err.message || 'Failed to add expense');
+    } finally {
+      setExpenseBusy(false);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      const res = await fetch(`/api/admin/expenses/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Turn a row into editable inputs, prefilled from the saved expense
+  const startEditExpense = (ex) => {
+    setEditExpenseError('');
+    setEditingExpenseId(ex.id);
+    setEditExpenseForm({
+      title: ex.title || '',
+      category: ex.category || 'General',
+      amount: ex.amount ?? '',
+      expense_date: String(ex.expense_date || ex.created_at || '').slice(0, 10),
+      notes: ex.notes || ''
+    });
+  };
+
+  const cancelEditExpense = () => {
+    setEditingExpenseId(null);
+    setEditExpenseError('');
+  };
+
+  const handleUpdateExpense = async (e) => {
+    e.preventDefault();
+    if (editingExpenseId == null) return;
+    setEditExpenseError('');
+    setEditExpenseBusy(true);
+    try {
+      const res = await fetch(`/api/admin/expenses/${editingExpenseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...editExpenseForm, amount: Number(editExpenseForm.amount) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to save expense');
+      setEditingExpenseId(null);
+      loadDashboardData();
+    } catch (err) {
+      setEditExpenseError(err.message || 'Failed to save expense');
+    } finally {
+      setEditExpenseBusy(false);
+    }
+  };
+
+  // Create a category (collection) to file products under
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    setCategoryError('');
+    setCategoryBusy(true);
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(categoryForm)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to create category');
+      setCategoryForm({ name: '', description: '' });
+      loadDashboardData();
+    } catch (err) {
+      setCategoryError(err.message || 'Failed to create category');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const startEditCategory = (cat) => {
+    setCategoryError('');
+    setEditingCategoryId(cat.id);
+    setEditCategoryForm({ name: cat.name || '', description: cat.description || '' });
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setCategoryError('');
+  };
+
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
+    if (editingCategoryId == null) return;
+    setCategoryError('');
+    setCategoryBusy(true);
+    try {
+      const res = await fetch(`/api/admin/categories/${editingCategoryId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(editCategoryForm)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to save category');
+      setEditingCategoryId(null);
+      loadDashboardData();
+    } catch (err) {
+      setCategoryError(err.message || 'Failed to save category');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    const count = Number(cat.product_count) || 0;
+    if (count > 0) {
+      window.alert(`"${cat.name}" still holds ${count} product(s). Move or delete them first.`);
+      return;
+    }
+    if (!window.confirm(`Delete the "${cat.name}" category?`)) return;
+    try {
+      const res = await fetch(`/api/admin/categories/${cat.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(data.error || 'Failed to delete category');
+        return;
+      }
+      loadDashboardData();
+    } catch (err) {
+      window.alert(err.message || 'Failed to delete category');
+    }
+  };
+
+  // Ask the server to send a real alert and report the provider's response
+  const handleSendTestEmail = async () => {
+    setTestEmailBusy(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setTestEmailResult(data);
+    } catch (err) {
+      setTestEmailResult({ sent: false, provider_message: err.message });
+    } finally {
+      setTestEmailBusy(false);
+    }
+  };
+
+  // Profit figures mirrored from the API, guarded so the first render is safe.
+  const pnl = {
+    revenue: Number(analytics?.totalRevenue) || 0,
+    cogs: Number(analytics?.costOfGoods) || 0,
+    gross: Number(analytics?.grossProfit) || 0,
+    expenses: Number(analytics?.totalExpenses) || 0,
+    net: Number(analytics?.netProfit) || 0,
+    margin: Number(analytics?.profitMargin) || 0
+  };
+  const expensesTotal = expenses.reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+
+  // Orders placed since the admin last acknowledged them
+  const newOrderCount = seenOrderId === null
+    ? 0
+    : orders.filter((o) => Number(o.id) > seenOrderId).length;
+
+  const markOrdersSeen = () => {
+    if (orders.length === 0) return;
+    const maxId = Math.max(...orders.map((o) => Number(o.id) || 0));
+    window.localStorage.setItem(SEEN_ORDERS_KEY, String(maxId));
+    setSeenOrderId(maxId);
+  };
+
+  // Short two-note chime, synthesised with the Web Audio API so there's no
+  // audio file to ship. Browsers can leave the context suspended until the
+  // first interaction, so the badge is the reliable signal and this is the
+  // nice-to-have.
+  const playNewOrderChime = () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      [880, 1174.66].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const at = ctx.currentTime + i * 0.18;
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(0.2, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.35);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(at);
+        osc.stop(at + 0.4);
+      });
+    } catch (e) {
+      // Sound is a nicety — never let it break the dashboard
+    }
+  };
+
+  // First visit: adopt the current newest order so history isn't all "new"
+  useEffect(() => {
+    if (seenOrderId !== null || orders.length === 0) return;
+    const maxId = Math.max(...orders.map((o) => Number(o.id) || 0));
+    window.localStorage.setItem(SEEN_ORDERS_KEY, String(maxId));
+    setSeenOrderId(maxId);
+  }, [orders, seenOrderId]);
+
+  // Chime once per newly-arrived order
+  useEffect(() => {
+    if (seenOrderId === null || orders.length === 0) return;
+    const newest = Math.max(...orders.map((o) => Number(o.id) || 0));
+    if (newest > seenOrderId && newest > lastChimedOrderIdRef.current) {
+      lastChimedOrderIdRef.current = newest;
+      playNewOrderChime();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, seenOrderId]);
+
+  // Poll for new orders so an alert can fire while the dashboard is open
+  useEffect(() => {
+    if (authLoading || !token || !isAdmin) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch('/api/admin/orders', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setOrders(data.orders || []);
+        }
+      } catch (e) {
+        // Transient — the next poll retries
+      }
+    }, 45000);
+    return () => clearInterval(id);
+  }, [token, isAdmin, authLoading]);
+
+  // Opening the Orders tab acknowledges whatever is currently listed
+  useEffect(() => {
+    if (activeTab === 'orders' && newOrderCount > 0) markOrdersSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, newOrderCount]);
 
   // Delete Order — removes the order, its items/payment rows and restores stock.
   const handleDeleteOrder = async (order) => {
@@ -747,16 +1097,16 @@ export default function AdminDashboard() {
       title: '',
       subtitle: '',
       description: '',
-      category_id: 1,
+      category_id: categories[0]?.id ?? 1,
       base_price: 9800,
       sale_price: '',
-      gender: 'Unisex',
-      concentration: 'Extrait de Parfum',
-      top_notes: 'Wild Bergamot, Kashmiri Saffron',
-      heart_notes: 'Damask Rose, Aged Cambodian Oud',
-      base_notes: 'Baltic Amber, Musk',
-      longevity: '16+ Hours',
-      sillage: 'Enormous',
+      gender: '',
+      concentration: '',
+      top_notes: '',
+      heart_notes: '',
+      base_notes: '',
+      longevity: '',
+      sillage: '',
       image_url: '/images/oud_royal.jpg',
       is_featured: true,
       is_bestseller: false
@@ -773,7 +1123,8 @@ export default function AdminDashboard() {
         id: v.id,
         size_label: v.size_label,
         price: v.price,
-        stock_quantity: v.stock_quantity
+        stock_quantity: v.stock_quantity,
+        cost_price: v.cost_price ?? ''
       }))
     );
     let gal = [];
@@ -794,13 +1145,15 @@ export default function AdminDashboard() {
       category_id: p.category_id || 1,
       base_price: p.base_price,
       sale_price: p.sale_price || '',
-      gender: p.gender || 'Unisex',
-      concentration: p.concentration || 'Extrait de Parfum',
+      // Preserve blanks — opening a non-perfume product in the editor must not
+      // sprinkle perfume defaults back onto it.
+      gender: p.gender || '',
+      concentration: p.concentration || '',
       top_notes: p.top_notes || '',
       heart_notes: p.heart_notes || '',
       base_notes: p.base_notes || '',
-      longevity: p.longevity || '16+ Hours',
-      sillage: p.sillage || 'Enormous',
+      longevity: p.longevity || '',
+      sillage: p.sillage || '',
       image_url: p.image_url || '/images/oud_royal.jpg',
       is_featured: p.is_featured === 1,
       is_bestseller: p.is_bestseller === 1
@@ -831,16 +1184,45 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      {/* New-order alert — sticky across every tab so it can't be missed */}
+      {newOrderCount > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gold/40 bg-gold/10 px-5 py-4">
+          <div className="flex items-center gap-3 text-sm">
+            <ShoppingBag className="w-5 h-5 text-gold shrink-0" />
+            <span className="text-ivory">
+              <strong className="text-gold font-num">{newOrderCount}</strong>{' '}
+              new {newOrderCount === 1 ? 'order' : 'orders'} since you last checked
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('orders')}
+              className="btn-gold px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider"
+            >
+              View orders
+            </button>
+            <button
+              onClick={markOrdersSeen}
+              className="btn-outline-gold px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider"
+            >
+              Mark as seen
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Tabs — horizontal scroll strip with hidden scrollbar on touch */}
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar flex gap-2 border-b border-gold/20 pb-2 text-xs uppercase font-bold tracking-wider">
         {[
           { id: 'analytics', label: 'Analytics & Sales', icon: BarChart3 },
           { id: 'products', label: `Products (${products.length})`, icon: Package },
-          { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingBag },
+          { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingBag, badge: newOrderCount },
           { id: 'customers', label: `Customers (${customers.length})`, icon: Users },
           { id: 'inquiries', label: `Inquiries${newInquiriesCount > 0 ? ` (${newInquiriesCount})` : ''}`, icon: Inbox },
           { id: 'posts', label: `Reels (${feedPosts.length})`, icon: Instagram },
           { id: 'ads', label: `Ads (${adBanners.length})`, icon: Megaphone },
+          { id: 'categories', label: `Categories (${categories.length})`, icon: FolderTree },
+          { id: 'expenses', label: `Expenses (${expenses.length})`, icon: Receipt },
           { id: 'coupons', label: `Coupons (${coupons.length})`, icon: Tag },
           { id: 'admins', label: `Admins (${admins.length})`, icon: Shield }
         ].map((tab) => {
@@ -856,6 +1238,14 @@ export default function AdminDashboard() {
               }`}
             >
               <Icon className="w-4 h-4" /> {tab.label}
+              {tab.badge > 0 && (
+                <span
+                  className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center"
+                  title={`${tab.badge} new order(s) since you last checked`}
+                >
+                  {tab.badge > 9 ? '9+' : tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -888,6 +1278,100 @@ export default function AdminDashboard() {
               <span className="text-xs text-muted uppercase tracking-wider font-medium">Active Formulations</span>
               <div className="font-num text-3xl font-bold text-ivory">{analytics.totalProducts}</div>
               <span className="text-[10px] text-muted font-num">Listed</span>
+            </div>
+          </div>
+
+          {/* Profit & Loss — revenue, less what the goods cost you, less running costs */}
+          <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="font-sans text-lg font-bold text-ivory">Profit &amp; Loss</h3>
+              <span className="text-[10px] text-muted">
+                Net margin:{' '}
+                <strong className={`font-num ${pnl.net >= 0 ? 'text-gold' : 'text-red-400'}`}>
+                  {pnl.margin.toFixed(1)}%
+                </strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="p-4 rounded-xl bg-obsidian border border-gold/15 space-y-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">Revenue</span>
+                <div className="font-num text-lg font-bold text-ivory">{formatPrice(pnl.revenue)}</div>
+              </div>
+              <div className="p-4 rounded-xl bg-obsidian border border-gold/15 space-y-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">Cost of goods</span>
+                <div className="font-num text-lg font-bold text-muted">-{formatPrice(pnl.cogs)}</div>
+              </div>
+              <div className="p-4 rounded-xl bg-obsidian border border-gold/15 space-y-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">Gross profit</span>
+                <div className={`font-num text-lg font-bold ${pnl.gross >= 0 ? 'text-gold' : 'text-red-400'}`}>
+                  {formatPrice(pnl.gross)}
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-obsidian border border-gold/15 space-y-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">Expenses ({analytics.expenseEntries || 0})</span>
+                <div className="font-num text-lg font-bold text-muted">-{formatPrice(pnl.expenses)}</div>
+              </div>
+              <div className="p-4 rounded-xl bg-obsidian border border-gold/30 space-y-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">Net profit</span>
+                <div className={`font-num text-lg font-extrabold ${pnl.net >= 0 ? 'text-gold' : 'text-red-400'}`}>
+                  {formatPrice(pnl.net)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Where the money is going */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-gold font-bold">Where the money goes</h4>
+                {(analytics.expenseBreakdown || []).length === 0 ? (
+                  <p className="text-[11px] text-muted">
+                    No expenses logged yet — add them in the Expenses tab and they will be subtracted here.
+                  </p>
+                ) : (
+                  <ul className="text-xs space-y-1.5">
+                    {analytics.expenseBreakdown.map((e) => (
+                      <li key={e.category} className="flex items-center justify-between gap-3 border-b border-gold/10 pb-1.5">
+                        <span className="text-ivory/80">
+                          {e.category} <span className="text-muted">({e.entries})</span>
+                        </span>
+                        <span className="font-num font-bold text-ivory">{formatPrice(e.total)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Month-by-month trend */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-gold font-bold">Last 6 months</h4>
+                {(analytics.monthlyProfit || []).length === 0 ? (
+                  <p className="text-[11px] text-muted">No sales or expenses in the last 6 months.</p>
+                ) : (
+                  <table className="w-full text-left text-[11px]">
+                    <thead>
+                      <tr className="border-b border-gold/15 text-gold uppercase tracking-wider">
+                        <th className="py-2">Month</th>
+                        <th className="py-2 text-right">Revenue</th>
+                        <th className="py-2 text-right">Expenses</th>
+                        <th className="py-2 text-right">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gold/10">
+                      {analytics.monthlyProfit.map((m) => (
+                        <tr key={m.month}>
+                          <td className="py-2 text-ivory/80">{m.month}</td>
+                          <td className="py-2 text-right font-num text-ivory">{formatPrice(m.revenue)}</td>
+                          <td className="py-2 text-right font-num text-muted">{formatPrice(m.expenses)}</td>
+                          <td className={`py-2 text-right font-num font-bold ${m.netProfit >= 0 ? 'text-gold' : 'text-red-400'}`}>
+                            {formatPrice(m.netProfit)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
 
@@ -945,7 +1429,7 @@ export default function AdminDashboard() {
                 <div className="flex gap-4">
                   <img src={p.image_url} alt={p.title} className="w-20 h-20 object-cover rounded-xl border border-gold/20" />
                   <div className="flex-1">
-                    <span className="text-[10px] uppercase text-gold font-bold block">{p.concentration}</span>
+                    <span className="text-[10px] uppercase text-gold font-bold block">{p.concentration || p.category_name}</span>
                     <h3 className="font-sans font-bold text-base text-ivory">{p.title}</h3>
                     <div className="font-num font-bold text-gold mt-1">
                       {formatPrice(p.sale_price || p.base_price)}
@@ -955,8 +1439,17 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="p-2.5 rounded bg-obsidian border border-gold/10 text-[11px] text-muted space-y-1">
-                  <div><strong className="text-gold">Top:</strong> {p.top_notes}</div>
-                  <div><strong className="text-gold">Heart:</strong> {p.heart_notes}</div>
+                  {p.top_notes || p.heart_notes ? (
+                    <>
+                      {p.top_notes && <div><strong className="text-gold">Top:</strong> {p.top_notes}</div>}
+                      {p.heart_notes && <div><strong className="text-gold">Heart:</strong> {p.heart_notes}</div>}
+                    </>
+                  ) : (
+                    <div>
+                      Non-fragrance item — filed under{' '}
+                      <strong className="text-gold">{p.category_name || 'Uncategorised'}</strong>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t border-gold/15">
@@ -985,13 +1478,58 @@ export default function AdminDashboard() {
         <div className="space-y-6 animate-fadeIn">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h2 className="font-sans text-xl font-bold text-ivory">All Orders</h2>
-            <a
-              href="/invoice-all"
-              className="btn-outline-gold px-5 py-2.5 text-xs uppercase tracking-wider flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" /> Download All Invoices (PDF)
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleSendTestEmail}
+                disabled={testEmailBusy}
+                title="Send a test alert to your configured notification inbox"
+                className="btn-outline-gold px-5 py-2.5 text-xs uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+              >
+                <Mail className="w-4 h-4" /> {testEmailBusy ? 'Sending…' : 'Test alert email'}
+              </button>
+              <a
+                href="/invoice-all"
+                className="btn-outline-gold px-5 py-2.5 text-xs uppercase tracking-wider flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Download All Invoices (PDF)
+              </a>
+            </div>
           </div>
+
+          {/* Result of the email health check */}
+          {testEmailResult && (
+            <div
+              className={`rounded-2xl border px-5 py-4 text-xs space-y-1 ${
+                testEmailResult.sent
+                  ? 'border-gold/40 bg-gold/10'
+                  : 'border-ivory/30 bg-obsidian'
+              }`}
+            >
+              <p className="font-bold text-ivory">
+                {testEmailResult.sent
+                  ? '✅ Provider accepted the email'
+                  : '❌ The email was NOT sent'}
+              </p>
+              {testEmailResult.recipients && (
+                <p className="text-muted">To: <strong className="text-ivory">{testEmailResult.recipients.join(', ')}</strong></p>
+              )}
+              {testEmailResult.sender && (
+                <p className="text-muted">From: <strong className="text-ivory">{testEmailResult.sender}</strong></p>
+              )}
+              {testEmailResult.provider_status != null && (
+                <p className="text-muted">Provider status: <strong className="text-ivory">{testEmailResult.provider_status}</strong></p>
+              )}
+              {testEmailResult.provider_message && (
+                <p className="text-muted break-words">Provider said: <span className="text-ivory">{testEmailResult.provider_message}</span></p>
+              )}
+              {testEmailResult.sent && (
+                <p className="text-muted pt-1">
+                  Check the inbox (and the spam folder) for a message titled{' '}
+                  <strong className="text-ivory">[TEST] New order KTZ-TEST</strong>.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -1563,23 +2101,30 @@ export default function AdminDashboard() {
                     onChange={(e) => setProductForm({ ...productForm, category_id: Number(e.target.value) })}
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
                   >
-                    <option value={1}>Personal Fragrances</option>
+                    {categories.length === 0 ? (
+                      <option value={1}>Personal Fragrances</option>
+                    ) : (
+                      categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div>
-                  <label className="text-muted block mb-1">Gender</label>
+                  <label className="text-muted block mb-1">Gender (optional)</label>
                   <select
                     value={productForm.gender}
                     onChange={(e) => setProductForm({ ...productForm, gender: e.target.value })}
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
                   >
+                    <option value="">Not specified</option>
                     <option>Unisex</option>
                     <option>For Him</option>
                     <option>For Her</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-muted block mb-1">Concentration tag</label>
+                  <label className="text-muted block mb-1">Concentration tag (optional)</label>
                   <input
                     type="text"
                     value={productForm.concentration}
@@ -1668,6 +2213,19 @@ export default function AdminDashboard() {
                         placeholder="Stock"
                         className="w-20 bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
                       />
+                      <input
+                        type="number"
+                        min="0"
+                        value={v.cost_price}
+                        onChange={(e) => {
+                          const next = [...variants];
+                          next[idx] = { ...v, cost_price: e.target.value };
+                          setVariants(next);
+                        }}
+                        placeholder="Cost ₹"
+                        title="Your making / purchase cost for this size — used to work out profit"
+                        className="w-24 bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none font-num"
+                      />
                       <button
                         type="button"
                         onClick={() => setVariants(variants.filter((_, i) => i !== idx))}
@@ -1680,7 +2238,7 @@ export default function AdminDashboard() {
                   ))}
                 </div>
                 <p className="text-[10px] text-muted">
-                  Each size gets its own price and stock. Sizes referenced by past orders can't be deleted — you'll be warned after saving.
+                  Each size gets its own price, stock and cost. Cost is what the size costs you to make or buy — it never shows to customers, only in your profit report. Sizes referenced by past orders can't be deleted — you'll be warned after saving.
                 </p>
               </div>
 
@@ -1727,6 +2285,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              <p className="text-[11px] text-muted pt-2 border-t border-gold/15">
+                <strong className="text-gold/80">Fragrance details — all optional.</strong> Leave these blank for
+                non-perfume items (candles, gift sets, accessories) and those sections stay hidden on the product page.
+              </p>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-muted block mb-1">Top Notes</label>
@@ -1734,6 +2297,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={productForm.top_notes}
                     onChange={(e) => setProductForm({ ...productForm, top_notes: e.target.value })}
+                    placeholder="e.g. Bergamot, Saffron"
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
                   />
                 </div>
@@ -1743,6 +2307,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={productForm.heart_notes}
                     onChange={(e) => setProductForm({ ...productForm, heart_notes: e.target.value })}
+                    placeholder="e.g. Damask Rose, Oud"
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
                   />
                 </div>
@@ -1752,6 +2317,30 @@ export default function AdminDashboard() {
                     type="text"
                     value={productForm.base_notes}
                     onChange={(e) => setProductForm({ ...productForm, base_notes: e.target.value })}
+                    placeholder="e.g. Amber, Musk"
+                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-muted block mb-1">Longevity</label>
+                  <input
+                    type="text"
+                    value={productForm.longevity}
+                    onChange={(e) => setProductForm({ ...productForm, longevity: e.target.value })}
+                    placeholder="e.g. 16+ Hours"
+                    className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-muted block mb-1">Sillage</label>
+                  <input
+                    type="text"
+                    value={productForm.sillage}
+                    onChange={(e) => setProductForm({ ...productForm, sillage: e.target.value })}
+                    placeholder="e.g. Enormous / Room-filling"
                     className="w-full bg-obsidian border border-gold/30 text-ivory p-2 rounded focus:outline-none"
                   />
                 </div>
@@ -1864,6 +2453,358 @@ export default function AdminDashboard() {
       )}
 
       {/* TAB: ADMINS */}
+      {/* TAB: CATEGORIES */}
+      {activeTab === 'categories' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <h2 className="font-sans text-xl font-bold text-ivory">Categories</h2>
+            <span className="text-xs text-muted">Collections shown in the shop's filter sidebar</span>
+          </div>
+
+          {/* Add a category */}
+          <form onSubmit={handleAddCategory} className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-4">
+            <h3 className="font-sans text-base font-bold text-ivory">Add a category</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={categoryForm.name}
+                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                placeholder="Name — e.g. Candles & Home"
+                maxLength={60}
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+              />
+              <input
+                type="text"
+                value={categoryForm.description}
+                onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                placeholder="Short description (optional)"
+                maxLength={160}
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+              />
+            </div>
+            {categoryError && <p className="text-[11px] text-ivory">{categoryError}</p>}
+            <button
+              type="submit"
+              disabled={categoryBusy}
+              className="btn-gold px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" /> {categoryBusy ? 'Saving…' : 'Add category'}
+            </button>
+            <p className="text-[10px] text-muted">
+              The URL slug is generated from the name. Rename a category any time — its products stay attached.
+            </p>
+          </form>
+
+          {/* Existing categories */}
+          {categories.length === 0 ? (
+            <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+              No categories yet. Add one to start filing products.
+            </div>
+          ) : (
+            <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gold/15 text-gold uppercase tracking-wider">
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Slug</th>
+                    <th className="py-3 px-4">Description</th>
+                    <th className="py-3 px-4">Products</th>
+                    <th className="py-3 px-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gold/10">
+                  {categories.map((cat) =>
+                    editingCategoryId === cat.id ? (
+                      <tr key={cat.id} className="bg-gold/5">
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={editCategoryForm.name}
+                            onChange={(e) => setEditCategoryForm({ ...editCategoryForm, name: e.target.value })}
+                            maxLength={60}
+                            className="w-full min-w-40 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-muted font-num">{cat.slug}</td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={editCategoryForm.description}
+                            onChange={(e) => setEditCategoryForm({ ...editCategoryForm, description: e.target.value })}
+                            placeholder="Description"
+                            maxLength={160}
+                            className="w-full min-w-40 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 font-num text-ivory">{cat.product_count}</td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={handleUpdateCategory}
+                              disabled={categoryBusy}
+                              title="Save changes"
+                              aria-label={`Save changes to ${cat.name}`}
+                              className="p-2 text-gold hover:bg-gold/15 rounded transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={cancelEditCategory}
+                              title="Cancel"
+                              aria-label="Cancel editing"
+                              className="p-2 text-muted hover:text-ivory hover:bg-ivory/10 rounded transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={cat.id} className="hover:bg-gold/5">
+                        <td className="py-3 px-4 font-sans font-bold text-ivory">{cat.name}</td>
+                        <td className="py-3 px-4 font-num text-muted">{cat.slug}</td>
+                        <td className="py-3 px-4 text-muted max-w-xs truncate">{cat.description || '—'}</td>
+                        <td className="py-3 px-4 font-num text-ivory">{cat.product_count}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => startEditCategory(cat)}
+                              title="Edit category"
+                              aria-label={`Edit category ${cat.name}`}
+                              className="p-2 text-muted hover:text-gold hover:bg-gold/10 rounded transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(cat)}
+                              title={Number(cat.product_count) > 0 ? 'Move its products out first' : 'Delete category'}
+                              aria-label={`Delete category ${cat.name}`}
+                              className="p-2 text-muted hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: EXPENSES */}
+      {activeTab === 'expenses' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <h2 className="font-sans text-xl font-bold text-ivory">Expenses</h2>
+            <span className="text-xs text-muted">
+              Logged total: <strong className="text-gold font-num">{formatPrice(expensesTotal)}</strong>
+            </span>
+          </div>
+
+          {/* Log an expense */}
+          <form onSubmit={handleAddExpense} className="bg-card border border-gold/20 rounded-2xl p-6 shadow-xl glass-panel space-y-4">
+            <h3 className="font-sans text-base font-bold text-ivory">Add an expense</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <input
+                type="text"
+                value={expenseForm.title}
+                onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
+                placeholder="What did you spend on? e.g. Instagram ads"
+                maxLength={120}
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+              />
+              <select
+                value={expenseForm.category}
+                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+              >
+                {EXPENSE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="1"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                placeholder="Amount ₹"
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none font-num"
+              />
+              <input
+                type="date"
+                value={expenseForm.expense_date}
+                onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
+                title="Leave blank for today"
+                className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none font-num"
+              />
+            </div>
+            <input
+              type="text"
+              value={expenseForm.notes}
+              onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
+              placeholder="Notes (optional) — invoice number, vendor, etc."
+              maxLength={200}
+              className="w-full bg-obsidian border border-gold/30 text-ivory p-2.5 rounded focus:outline-none"
+            />
+            {expenseError && <p className="text-[11px] text-ivory">{expenseError}</p>}
+            <button
+              type="submit"
+              disabled={expenseBusy}
+              className="btn-gold px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" /> {expenseBusy ? 'Saving…' : 'Add expense'}
+            </button>
+          </form>
+
+          {/* Logged expenses */}
+          {expenses.length === 0 ? (
+            <div className="bg-card border border-gold/20 rounded-2xl p-10 text-center text-sm text-muted">
+              No expenses yet. Log rent, ads, packaging or stock purchases here — they are subtracted from
+              gross profit to show your real net profit.
+            </div>
+          ) : (
+            <div className="bg-card border border-gold/20 rounded-2xl p-6 shadow-2xl glass-panel overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gold/15 text-gold uppercase tracking-wider">
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Description</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Notes</th>
+                    <th className="py-3 px-4">Added By</th>
+                    <th className="py-3 px-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gold/10">
+                  {expenses.map((ex) =>
+                    editingExpenseId === ex.id ? (
+                      /* Editable row — Save commits via the expense PUT endpoint */
+                      <tr key={ex.id} className="bg-gold/5">
+                        <td className="py-2 px-3">
+                          <input
+                            type="date"
+                            value={editExpenseForm.expense_date}
+                            onChange={(e) => setEditExpenseForm({ ...editExpenseForm, expense_date: e.target.value })}
+                            className="w-32 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none font-num"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={editExpenseForm.title}
+                            onChange={(e) => setEditExpenseForm({ ...editExpenseForm, title: e.target.value })}
+                            placeholder="Description"
+                            maxLength={120}
+                            className="w-full min-w-40 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <select
+                            value={editExpenseForm.category}
+                            onChange={(e) => setEditExpenseForm({ ...editExpenseForm, category: e.target.value })}
+                            className="bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none"
+                          >
+                            {EXPENSE_CATEGORIES.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="number"
+                            min="1"
+                            value={editExpenseForm.amount}
+                            onChange={(e) => setEditExpenseForm({ ...editExpenseForm, amount: e.target.value })}
+                            placeholder="Amount ₹"
+                            className="w-24 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none font-num"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={editExpenseForm.notes}
+                            onChange={(e) => setEditExpenseForm({ ...editExpenseForm, notes: e.target.value })}
+                            placeholder="Notes"
+                            maxLength={200}
+                            className="w-full min-w-32 bg-obsidian border border-gold/30 text-ivory p-1.5 rounded focus:outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-muted">{ex.created_by_name || '—'}</td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={handleUpdateExpense}
+                              disabled={editExpenseBusy}
+                              title="Save changes"
+                              aria-label={`Save changes to ${ex.title}`}
+                              className="p-2 text-gold hover:bg-gold/15 rounded transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={cancelEditExpense}
+                              title="Cancel"
+                              aria-label="Cancel editing"
+                              className="p-2 text-muted hover:text-ivory hover:bg-ivory/10 rounded transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={ex.id} className="hover:bg-gold/5">
+                        <td className="py-3 px-4 font-num text-muted">
+                          {String(ex.expense_date || ex.created_at || '').slice(0, 10)}
+                        </td>
+                        <td className="py-3 px-4 font-sans font-bold text-ivory">{ex.title}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2.5 py-1 bg-gold/20 text-gold rounded font-bold uppercase text-[10px]">
+                            {ex.category}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-num font-bold text-gold">{formatPrice(ex.amount)}</td>
+                        <td className="py-3 px-4 text-muted max-w-xs truncate">{ex.notes || '—'}</td>
+                        <td className="py-3 px-4 text-muted">{ex.created_by_name || '—'}</td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => startEditExpense(ex)}
+                              title="Edit expense"
+                              aria-label={`Edit expense ${ex.title}`}
+                              className="p-2 text-muted hover:text-gold hover:bg-gold/10 rounded transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteExpense(ex.id)}
+                              title="Delete expense"
+                              aria-label={`Delete expense ${ex.title}`}
+                              className="p-2 text-muted hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {editExpenseError && (
+            <p className="text-[11px] text-ivory">{editExpenseError}</p>
+          )}
+        </div>
+      )}
+
       {activeTab === 'admins' && (
         <div className="space-y-6 animate-fadeIn">
           <h2 className="font-sans text-xl font-bold text-ivory">Manage Admins</h2>

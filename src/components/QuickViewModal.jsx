@@ -75,7 +75,7 @@ export default function QuickViewModal({ product, onClose }) {
           <div className="p-5 sm:p-6 md:p-8 flex flex-col justify-between space-y-4">
           <div>
             <span className="text-xs uppercase tracking-widest text-gold font-medium">
-              {product.concentration}
+              {product.concentration || product.category_name}
             </span>
             <h2 className="font-sans text-2xl font-bold text-ivory mt-1">{product.title}</h2>
             <p className="text-xs text-muted mt-1 font-light">{product.subtitle}</p>
@@ -106,12 +106,14 @@ export default function QuickViewModal({ product, onClose }) {
               {product.description}
             </p>
 
-            {/* Notes snapshot */}
-            <div className="mt-4 p-3 rounded-lg bg-obsidian border border-gold/15 text-xs space-y-1">
-              <div><strong className="text-gold">Top:</strong> {product.top_notes}</div>
-              <div><strong className="text-gold">Heart:</strong> {product.heart_notes}</div>
-              <div><strong className="text-gold">Base:</strong> {product.base_notes}</div>
-            </div>
+            {/* Notes snapshot — only for products that actually have notes */}
+            {(product.top_notes || product.heart_notes || product.base_notes) && (
+              <div className="mt-4 p-3 rounded-lg bg-obsidian border border-gold/15 text-xs space-y-1">
+                {product.top_notes && <div><strong className="text-gold">Top:</strong> {product.top_notes}</div>}
+                {product.heart_notes && <div><strong className="text-gold">Heart:</strong> {product.heart_notes}</div>}
+                {product.base_notes && <div><strong className="text-gold">Base:</strong> {product.base_notes}</div>}
+              </div>
+            )}
 
             {/* Variant Selector */}
             {product.variants && product.variants.length > 0 && (

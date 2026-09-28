@@ -2,10 +2,17 @@ const express = require('express');
 const crypto = require('crypto');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
-const { sendEmail, orderPlacedEmail, orderStatusEmail } = require('../utils/mailer');
+const { sendEmail, sendEmailWithResult, resolveAlertRecipients, orderPlacedEmail, orderStatusEmail, newOrderAlertEmail } = require('../utils/mailer');
 const { buildInvoicePdf } = require('../utils/invoicePdf');
 
 const router = express.Router();
+
+// `order_items` rows carry the store's internal unit cost (used for profit
+// reporting). Strip it before an order is ever serialized to a customer —
+// their margin is none of the shopper's business.
+function publicItems(items) {
+  return (items || []).map(({ cost_price, ...item }) => item);
+}
 
 // Create a Razorpay order via plain fetch() — works identically on Node and
 // Cloudflare Workers. (The official SDK uses axios over node:http, which is
@@ -53,7 +60,7 @@ function verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, signature) 
 // Create Order (Razorpay)
 router.post('/', async (req, res) => {
   try {
-    const { customer_name, customer_email, phone, shipping_address, cart_items, coupon_code, payment_method, gift_message } = req.body;
+    const { customer_name, customer_email, phone, shipping_address, cart_items, coupon_code, coupon_codes, payment_method, gift_message } = req.body;
 
     if (!customer_name || !customer_email || !phone || !shipping_address || !cart_items || cart_items.length === 0) {
       return res.status(400).json({ error: 'Incomplete shipping or cart details' });
@@ -93,29 +100,46 @@ router.post('/', async (req, res) => {
         product_title: variant.product_title,
         size_label: variant.size_label,
         price: variant.price,
+        // Freeze the unit cost now — later cost-price edits must not change
+        // the profit already reported for this order.
+        cost_price: Number(variant.cost_price) || 0,
         quantity: item.quantity,
         total: itemTotal
       });
     }
 
-    // Process Coupon if provided
-    let discountAmount = 0;
-    if (coupon_code) {
-      const coupon = await getQuery('SELECT * FROM coupons WHERE code = ? AND active = 1', [coupon_code.toUpperCase().trim()]);
-      if (coupon) {
-        if (subtotal >= coupon.min_order_value) {
-          if (coupon.discount_type === 'percentage') {
-            discountAmount = (subtotal * coupon.discount_value) / 100;
-          } else {
-            discountAmount = coupon.discount_value;
-          }
-          if (discountAmount > subtotal) discountAmount = subtotal;
+    // Process Coupons — customers may stack several, and the discounts ADD UP
+    // (10% + 20% = 30% off). Accepts the new `coupon_codes` array and the legacy
+    // single `coupon_code`. This is the authoritative calculation: the browser's
+    // preview is never trusted.
+    const requestedCodes = Array.isArray(coupon_codes)
+      ? coupon_codes
+      : coupon_code
+        ? [coupon_code]
+        : [];
 
-          // Increment coupon usage
-          await runQuery('UPDATE coupons SET times_used = times_used + 1 WHERE id = ?', [coupon.id]);
-        }
-      }
+    let discountAmount = 0;
+    const seenCoupons = new Set();
+    for (const requested of requestedCodes) {
+      const normalized = String(requested || '').toUpperCase().trim();
+      // Skip blanks and repeats — the same code never counts twice.
+      if (!normalized || seenCoupons.has(normalized)) continue;
+      seenCoupons.add(normalized);
+
+      const coupon = await getQuery('SELECT * FROM coupons WHERE code = ? AND active = 1', [normalized]);
+      if (!coupon) continue;                    // unknown or switched off
+      if (subtotal < coupon.min_order_value) continue;  // threshold not met
+
+      // Additive: every percentage comes off the full subtotal.
+      discountAmount += coupon.discount_type === 'percentage'
+        ? (subtotal * coupon.discount_value) / 100
+        : coupon.discount_value;
+
+      await runQuery('UPDATE coupons SET times_used = times_used + 1 WHERE id = ?', [coupon.id]);
     }
+
+    // No cap on stacking, but the order can never be discounted below ₹0.
+    if (discountAmount > subtotal) discountAmount = subtotal;
 
     const shippingFee = subtotal >= 5000 ? 0 : 59;
     const totalAmount = Math.max(0, subtotal - discountAmount + shippingFee);
@@ -175,9 +199,9 @@ router.post('/', async (req, res) => {
     // Insert order items & reduce stock
     for (let item of itemsToInsert) {
       await runQuery(`
-        INSERT INTO order_items (order_id, product_id, variant_id, product_title, size_label, price, quantity, total)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [orderId, item.product_id, item.variant_id, item.product_title, item.size_label, item.price, item.quantity, item.total]);
+        INSERT INTO order_items (order_id, product_id, variant_id, product_title, size_label, price, cost_price, quantity, total)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [orderId, item.product_id, item.variant_id, item.product_title, item.size_label, item.price, item.cost_price, item.quantity, item.total]);
 
       // Deduct stock
       await runQuery('UPDATE variants SET stock_quantity = stock_quantity - ? WHERE id = ?', [item.quantity, item.variant_id]);
@@ -214,10 +238,38 @@ router.post('/', async (req, res) => {
       console.error('[order-email] failed:', emailErr.message);
     }
 
+    // Alert the store owner. Awaited for the same reason as above (Workers
+    // freeze the isolate once the response is sent), and wrapped in its own
+    // try/catch so it can never affect the customer's confirmation.
+    try {
+      const alertTo = await resolveAlertRecipients();
+      if (alertTo.length > 0) {
+        const site = (process.env.PUBLIC_SITE_URL || '').replace(/\/$/, '');
+        const alert = newOrderAlertEmail({
+          order: createdOrder,
+          items: orderItems,
+          adminUrl: site ? `${site}/admin` : ''
+        });
+        const alertResult = await sendEmailWithResult({
+          to: alertTo,
+          subject: alert.subject,
+          html: alert.html,
+          text: alert.text
+        });
+        // Log Brevo's own words on failure — a silent boolean told us nothing
+        // about why an alert never arrived.
+        if (!alertResult.ok) {
+          console.warn('[admin-alert] not delivered', alertResult.status, alertResult.providerMessage);
+        }
+      }
+    } catch (emailErr) {
+      console.error('[admin-alert] failed:', emailErr.message);
+    }
+
     res.status(201).json({
       message: 'Order created successfully',
       order: createdOrder,
-      items: orderItems,
+      items: publicItems(orderItems),
       razorpay: razorpayOrder
         ? {
             order_id: razorpayOrder.id,
@@ -307,7 +359,7 @@ router.get('/my-orders', authenticateToken, async (req, res) => {
   try {
     const orders = await allQuery('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [req.user.id]);
     for (let order of orders) {
-      order.items = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+      order.items = publicItems(await allQuery('SELECT * FROM order_items WHERE order_id = ?', [order.id]));
     }
     res.json({ orders });
   } catch (error) {
@@ -337,7 +389,7 @@ router.get('/track/:query', async (req, res) => {
       return res.status(404).json({ error: 'No order found with the provided details' });
     }
 
-    order.items = await allQuery('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+    order.items = publicItems(await allQuery('SELECT * FROM order_items WHERE order_id = ?', [order.id]));
     res.json({ order });
   } catch (error) {
     res.status(500).json({ error: 'Failed to track order' });

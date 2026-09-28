@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import ConfirmOrderModal from '../components/ConfirmOrderModal';
 
 export default function CheckoutPage() {
-  const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupon, setAppliedCoupon, giftMessage, clearCart, replaceCart } = useCart();
+  const { cart, subtotalINR, discountINR, shippingINR, totalINR, formatPrice, appliedCoupons, setAppliedCoupons, addCoupon, removeCoupon, giftMessage, clearCart, replaceCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -83,38 +83,47 @@ export default function CheckoutPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Re-validate an already-applied coupon whenever the subtotal changes (e.g. quantity edits)
+  // Whenever the subtotal changes (e.g. a quantity edit), drop any coupon whose
+  // minimum order value is no longer met. The discount *amounts* are recomputed
+  // centrally in CartContext, so they always track the subtotal automatically.
   useEffect(() => {
-    if (appliedCoupon) {
-      if (subtotalINR < (appliedCoupon.min_order_value || 0)) {
-        setAppliedCoupon(null);
-        setCouponSuccess('');
-        setCouponError('Coupon removed — minimum order value no longer met');
-      } else {
-        const newDiscount = appliedCoupon.discount_type === 'percentage'
-          ? (subtotalINR * appliedCoupon.discount_value) / 100
-          : appliedCoupon.discount_value;
-        setAppliedCoupon({ ...appliedCoupon, discount_amount: newDiscount });
-      }
+    if (appliedCoupons.length === 0) return;
+    const stillValid = appliedCoupons.filter((c) => subtotalINR >= (c.min_order_value || 0));
+    if (stillValid.length !== appliedCoupons.length) {
+      setAppliedCoupons(stillValid);
+      setCouponSuccess('');
+      setCouponError('A coupon was removed — its minimum order value is no longer met');
     }
   }, [subtotalINR]);
 
   const handleApplyCoupon = async (e) => {
     e.preventDefault();
-    if (!couponCode.trim()) return;
+    const code = couponCode.trim();
+    if (!code) return;
     setCouponError('');
     setCouponSuccess('');
+
+    // The same code never counts twice — checked here and again server-side.
+    if (appliedCoupons.some((c) => c.code.toUpperCase() === code.toUpperCase())) {
+      setCouponError('That coupon is already applied');
+      return;
+    }
+
     setValidatingCoupon(true);
     try {
       const res = await fetch('/api/coupons/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode, subtotal: subtotalINR })
+        body: JSON.stringify({
+          code,
+          subtotal: subtotalINR,
+          applied_codes: appliedCoupons.map((c) => c.code)
+        })
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setAppliedCoupon(data.coupon);
-        setCouponSuccess(`Coupon ${data.coupon.code} applied! You saved ${formatPrice(data.coupon.discount_amount)}`);
+        addCoupon(data.coupon);
+        setCouponSuccess(`Coupon ${data.coupon.code} added! You saved ${formatPrice(data.coupon.discount_amount)}`);
         setCouponCode('');
       } else {
         setCouponError(data.error || 'Invalid coupon code');
@@ -126,8 +135,8 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
+  const handleRemoveCoupon = (code) => {
+    removeCoupon(code);
     setCouponSuccess('');
     setCouponError('');
   };
@@ -167,7 +176,7 @@ export default function CheckoutPage() {
           phone,
           shipping_address: address,
           cart_items: cart,
-          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          coupon_codes: appliedCoupons.map((c) => c.code),
           payment_method: paymentMethod,
           gift_message: giftMessage
         })
@@ -413,40 +422,54 @@ export default function CheckoutPage() {
             ))}
           </div>
 
-          {/* Apply Coupon */}
+          {/* Coupons — stack as many as you like; the discounts add up */}
           <div className="space-y-2 pt-2">
-            {appliedCoupon ? (
-              <div className="flex items-center justify-between p-2.5 rounded bg-gold/10 border border-gold/30 text-xs text-gold">
-                <span className="flex items-center gap-1.5 font-semibold">
-                  <Tag className="w-3.5 h-3.5" /> {appliedCoupon.code} Applied
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRemoveCoupon}
-                  className="text-xs underline text-ivory hover:text-muted"
-                >
-                  Remove
-                </button>
+            {appliedCoupons.length > 0 && (
+              <div className="space-y-1.5">
+                {appliedCoupons.map((c) => (
+                  <div
+                    key={c.code}
+                    className="flex items-center justify-between p-2.5 rounded bg-gold/10 border border-gold/30 text-xs text-gold"
+                  >
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <Tag className="w-3.5 h-3.5" /> {c.code} applied
+                      <span className="text-ivory/70 font-normal">
+                        {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCoupon(c.code)}
+                      className="text-xs underline text-ivory hover:text-muted"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon(e); } }}
-                  placeholder="Promo Code (e.g. KATHRAZ10)"
-                  className="bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2.5 rounded-lg focus:outline-none focus:border-gold flex-1 uppercase tracking-wider"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  disabled={validatingCoupon || !couponCode.trim()}
-                  className="btn-outline-gold px-4 py-2.5 text-xs font-semibold uppercase rounded-lg disabled:opacity-50"
-                >
-                  {validatingCoupon ? '...' : 'Apply'}
-                </button>
-              </div>
+            )}
+
+            {/* Always shown, so more codes can be stacked on top of what's applied */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon(e); } }}
+                placeholder={appliedCoupons.length > 0 ? 'Add another promo code' : 'Promo Code (e.g. KATHRAZ10)'}
+                className="bg-obsidian border border-gold/30 text-xs text-ivory px-3 py-2.5 rounded-lg focus:outline-none focus:border-gold flex-1 uppercase tracking-wider"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                disabled={validatingCoupon || !couponCode.trim()}
+                className="btn-outline-gold px-4 py-2.5 text-xs font-semibold uppercase rounded-lg disabled:opacity-50"
+              >
+                {validatingCoupon ? '...' : 'Apply'}
+              </button>
+            </div>
+            {appliedCoupons.length > 0 && (
+              <p className="text-[10px] text-muted">Coupons stack — their discounts are added together.</p>
             )}
             {couponError && <p className="text-[11px] text-ivory">{couponError}</p>}
             {couponSuccess && <p className="text-[11px] text-gold">{couponSuccess}</p>}

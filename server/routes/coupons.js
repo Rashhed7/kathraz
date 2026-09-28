@@ -6,12 +6,22 @@ const router = express.Router();
 // Validate Coupon
 router.post('/validate', async (req, res) => {
   try {
-    const { code, subtotal } = req.body;
+    const { code, subtotal, applied_codes } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Coupon code required' });
     }
 
-    const coupon = await getQuery('SELECT * FROM coupons WHERE code = ? AND active = 1', [code.toUpperCase().trim()]);
+    const normalized = code.toUpperCase().trim();
+
+    // Coupons stack, but the same code twice is never allowed.
+    const alreadyApplied = Array.isArray(applied_codes)
+      ? applied_codes.map((c) => String(c).toUpperCase().trim())
+      : [];
+    if (alreadyApplied.includes(normalized)) {
+      return res.status(400).json({ error: 'That coupon is already applied' });
+    }
+
+    const coupon = await getQuery('SELECT * FROM coupons WHERE code = ? AND active = 1', [normalized]);
     if (!coupon) {
       return res.status(404).json({ error: 'Invalid or expired coupon code' });
     }
@@ -33,6 +43,9 @@ router.post('/validate', async (req, res) => {
         code: coupon.code,
         discount_type: coupon.discount_type,
         discount_value: coupon.discount_value,
+        // Echoed back so the cart can re-check the threshold whenever the
+        // subtotal changes, instead of on apply only.
+        min_order_value: coupon.min_order_value,
         discount_amount: discountAmount
       }
     });

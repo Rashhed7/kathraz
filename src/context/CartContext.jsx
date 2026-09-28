@@ -20,7 +20,12 @@ export const CartProvider = ({ children }) => {
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [currency, setCurrency] = useState('INR');
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  // Coupons stack: a customer can apply several and the discounts add up
+  // (10% + 20% = 30% off). Each percentage comes off the FULL subtotal, and
+  // the combined discount is clamped to the subtotal so an order can never go
+  // below zero. orders.js recomputes all of this server-side — the value here
+  // is only a preview.
+  const [appliedCoupons, setAppliedCoupons] = useState([]);
   const [giftMessage, setGiftMessage] = useState('');
 
   useEffect(() => {
@@ -74,8 +79,24 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = () => {
     setCart([]);
-    setAppliedCoupon(null);
+    setAppliedCoupons([]);
     setGiftMessage('');
+  };
+
+  // Apply a validated coupon. The same code is never counted twice.
+  const addCoupon = (coupon) => {
+    if (!coupon || !coupon.code) return;
+    const code = String(coupon.code).toUpperCase().trim();
+    setAppliedCoupons((current) =>
+      current.some((c) => String(c.code).toUpperCase() === code)
+        ? current
+        : [...current, { ...coupon, code }]
+    );
+  };
+
+  const removeCoupon = (code) => {
+    const target = String(code || '').toUpperCase();
+    setAppliedCoupons((current) => current.filter((c) => String(c.code).toUpperCase() !== target));
   };
 
   // Replace the entire cart contents (used by checkout cart validation)
@@ -85,14 +106,15 @@ export const CartProvider = ({ children }) => {
 
   const subtotalINR = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
+  // Additive stacking: every coupon's discount is summed, then clamped to the
+  // subtotal (no percentage cap, but the cart can never go below ₹0).
   let discountINR = 0;
-  if (appliedCoupon) {
-    if (appliedCoupon.discount_type === 'percentage') {
-      discountINR = (subtotalINR * appliedCoupon.discount_value) / 100;
-    } else {
-      discountINR = appliedCoupon.discount_value;
-    }
+  for (const coupon of appliedCoupons) {
+    discountINR += coupon.discount_type === 'percentage'
+      ? (subtotalINR * coupon.discount_value) / 100
+      : coupon.discount_value;
   }
+  discountINR = Math.min(discountINR, subtotalINR);
 
   const shippingINR = subtotalINR >= 5000 || cart.length === 0 ? 0 : 59;
   const totalINR = Math.max(0, subtotalINR - discountINR + shippingINR);
@@ -122,8 +144,10 @@ export const CartProvider = ({ children }) => {
         replaceCart,
         currency,
         setCurrency,
-        appliedCoupon,
-        setAppliedCoupon,
+        appliedCoupons,
+        setAppliedCoupons,
+        addCoupon,
+        removeCoupon,
         giftMessage,
         setGiftMessage,
         subtotalINR,

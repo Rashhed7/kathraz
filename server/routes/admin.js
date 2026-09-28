@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getQuery, allQuery, runQuery } = require('../database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { sendEmail, orderStatusEmail } = require('../utils/mailer');
+const { sendEmail, sendEmailWithResult, resolveAlertRecipients, newOrderAlertEmail, orderStatusEmail } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -37,14 +37,42 @@ async function findUniqueSlug(baseSlug, excludeId = null) {
 router.use(authenticateToken);
 router.use(requireAdmin);
 
-// 1. Dashboard Analytics KPI
+// "Money we actually earned": a cancelled order never brings in revenue.
+// Takes a table alias so the same rule can be applied to joined queries.
+function salesFilter(alias = '') {
+  const p = alias ? `${alias}.` : '';
+  return `(${p}payment_status = 'Paid' OR ${p}order_status != 'Cancelled')`;
+}
+
+// 1. Dashboard Analytics KPI + Profit & Loss
+//     Revenue               = billed order totals (net of discounts, incl. shipping)
+//     Cost of Goods (COGS)  = snapshotted unit cost x quantity for the same orders
+//     Gross Profit          = Revenue - COGS
+//     Expenses              = every row the admin logged in the Expenses tab
+//     Net Profit            = Gross Profit - Expenses
 router.get('/analytics', async (req, res) => {
   try {
-    const totalRevenueRes = await getQuery(`SELECT SUM(total_amount) as total FROM orders WHERE payment_status = 'Paid' OR order_status != 'Cancelled'`);
+    const totalRevenueRes = await getQuery(`SELECT SUM(total_amount) as total FROM orders WHERE ${salesFilter()}`);
     const totalOrdersRes = await getQuery(`SELECT COUNT(*) as total FROM orders`);
     const totalCustomersRes = await getQuery(`SELECT COUNT(*) as total FROM users WHERE role = 'customer'`);
     const totalProductsRes = await getQuery(`SELECT COUNT(*) as total FROM products`);
     const lowStockRes = await getQuery(`SELECT COUNT(*) as total FROM variants WHERE stock_quantity <= 10`);
+
+    // Cost of the goods actually sold (uses the per-order snapshot, so past
+    // profit stays stable when a product's cost price changes).
+    const cogsRes = await getQuery(`
+      SELECT SUM(oi.cost_price * oi.quantity) as total
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE ${salesFilter('o')}
+    `);
+    const expensesRes = await getQuery('SELECT SUM(amount) as total, COUNT(*) as entries FROM expenses');
+
+    const totalRevenue = Number(totalRevenueRes.total) || 0;
+    const costOfGoods = Number(cogsRes.total) || 0;
+    const totalExpenses = Number(expensesRes.total) || 0;
+    const grossProfit = totalRevenue - costOfGoods;
+    const netProfit = grossProfit - totalExpenses;
 
     const recentOrders = await allQuery(`SELECT * FROM orders ORDER BY id DESC LIMIT 5`);
     const categorySales = await allQuery(`
@@ -55,20 +83,210 @@ router.get('/analytics', async (req, res) => {
       GROUP BY c.name
     `);
 
+    // Where the money is going — expenses grouped by category.
+    const expenseBreakdown = await allQuery(`
+      SELECT category, COUNT(*) as entries, SUM(amount) as total
+      FROM expenses
+      GROUP BY category
+      ORDER BY total DESC
+    `);
+
+    // Last 6 months of revenue / COGS / expenses so trends are visible.
+    const monthlyRevenue = await allQuery(`
+      SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') as month, SUM(total_amount) as revenue
+      FROM orders
+      WHERE ${salesFilter()}
+        AND created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
+      GROUP BY 1
+    `);
+    const monthlyCogs = await allQuery(`
+      SELECT to_char(date_trunc('month', o.created_at), 'YYYY-MM') as month, SUM(oi.cost_price * oi.quantity) as cogs
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE ${salesFilter('o')}
+        AND o.created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
+      GROUP BY 1
+    `);
+    const monthlyExpenses = await allQuery(`
+      SELECT to_char(date_trunc('month', expense_date), 'YYYY-MM') as month, SUM(amount) as expenses
+      FROM expenses
+      WHERE expense_date >= date_trunc('month', NOW()) - INTERVAL '5 months'
+      GROUP BY 1
+    `);
+
+    const monthly = new Map();
+    const touch = (month) => {
+      if (!monthly.has(month)) monthly.set(month, { month, revenue: 0, cogs: 0, expenses: 0 });
+      return monthly.get(month);
+    };
+    for (const r of monthlyRevenue) touch(r.month).revenue = Number(r.revenue) || 0;
+    for (const r of monthlyCogs) touch(r.month).cogs = Number(r.cogs) || 0;
+    for (const r of monthlyExpenses) touch(r.month).expenses = Number(r.expenses) || 0;
+    const monthlyProfit = [...monthly.values()]
+      .map((m) => ({ ...m, grossProfit: m.revenue - m.cogs, netProfit: m.revenue - m.cogs - m.expenses }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
     res.json({
       analytics: {
-        totalRevenue: totalRevenueRes.total || 0,
+        totalRevenue,
         totalOrders: totalOrdersRes.total || 0,
         totalCustomers: totalCustomersRes.total || 0,
         totalProducts: totalProductsRes.total || 0,
-        lowStockItems: lowStockRes.total || 0
+        lowStockItems: lowStockRes.total || 0,
+        costOfGoods,
+        grossProfit,
+        totalExpenses,
+        expenseEntries: Number(expensesRes.entries) || 0,
+        netProfit,
+        // Margin on net profit; 0 when nothing has been sold yet.
+        profitMargin: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
       },
       recentOrders,
-      categorySales
+      categorySales,
+      expenseBreakdown,
+      monthlyProfit
     });
   } catch (error) {
     console.error('Analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// 1b. Admin product list — same shape as the storefront list but WITH the
+// internal cost_price, which the public /api/products endpoints never send.
+router.get('/products', async (req, res) => {
+  try {
+    const products = await allQuery(`
+      SELECT p.*, c.name as category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ORDER BY p.is_featured DESC, p.id DESC
+    `);
+    for (const product of products) {
+      product.variants = await allQuery('SELECT * FROM variants WHERE product_id = ? ORDER BY price ASC', [product.id]);
+      if (product.gallery_json) {
+        try {
+          product.gallery = JSON.parse(product.gallery_json);
+        } catch (e) {
+          product.gallery = [product.image_url];
+        }
+      } else {
+        product.gallery = [product.image_url];
+      }
+    }
+    res.json({ products });
+  } catch (error) {
+    console.error('Admin fetch products error:', error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+// 1c. Category Management — the store's collections. Admins create these so
+// non-fragrance ranges (candles, gift sets, oils, accessories…) can be listed
+// alongside perfume instead of everything landing in one fixed category.
+
+async function findUniqueCategorySlug(baseSlug, excludeId = null) {
+  const safe = baseSlug || 'category';
+  let candidate = safe;
+  let suffix = 2;
+  while (true) {
+    const clash = excludeId == null
+      ? await getQuery('SELECT id FROM categories WHERE slug = ?', [candidate])
+      : await getQuery('SELECT id FROM categories WHERE slug = ? AND id != ?', [candidate, excludeId]);
+    if (!clash) return candidate;
+    candidate = `${safe}-${suffix}`;
+    suffix += 1;
+  }
+}
+
+// List categories with how many products each holds
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await allQuery(`
+      SELECT c.*, COUNT(p.id) as product_count
+      FROM categories c
+      LEFT JOIN products p ON p.category_id = c.id
+      GROUP BY c.id
+      ORDER BY c.name ASC
+    `);
+    res.json({ categories });
+  } catch (error) {
+    console.error('Fetch categories error:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Create a category
+router.post('/categories', async (req, res) => {
+  try {
+    const cleanName = String(req.body.name || '').trim();
+    if (!cleanName) {
+      return res.status(400).json({ error: 'A category name is required' });
+    }
+
+    const slug = await findUniqueCategorySlug(slugify(req.body.slug || cleanName));
+    const result = await runQuery(
+      `INSERT INTO categories (name, slug, description, image_url) VALUES (?, ?, ?, ?)`,
+      [cleanName, slug, req.body.description || '', req.body.image_url || '']
+    );
+    const category = await getQuery('SELECT * FROM categories WHERE id = ?', [result.lastID]);
+    res.status(201).json({ message: 'Category created', category });
+  } catch (error) {
+    console.error('Create category error:', error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// Rename / re-describe a category
+router.put('/categories/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await getQuery('SELECT * FROM categories WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    const cleanName = String(req.body.name ?? existing.name).trim();
+    if (!cleanName) {
+      return res.status(400).json({ error: 'A category name is required' });
+    }
+
+    // Re-slug on an explicit slug, or automatically when the name changed.
+    // (Renaming to the same name must not churn already-published URLs.)
+    let slug = existing.slug;
+    if (typeof req.body.slug === 'string' && req.body.slug.trim() !== '') {
+      slug = await findUniqueCategorySlug(slugify(req.body.slug), id);
+    } else if (cleanName !== existing.name) {
+      slug = await findUniqueCategorySlug(slugify(cleanName), id);
+    }
+
+    await runQuery(
+      `UPDATE categories SET name = ?, slug = ?, description = ?, image_url = ? WHERE id = ?`,
+      [cleanName, slug, req.body.description ?? existing.description ?? '', req.body.image_url ?? existing.image_url ?? '', id]
+    );
+    const category = await getQuery('SELECT * FROM categories WHERE id = ?', [id]);
+    res.json({ message: 'Category updated', category });
+  } catch (error) {
+    console.error('Update category error:', error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// Delete a category — refused while products still use it, so nothing is orphaned
+router.delete('/categories/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const inUse = await getQuery('SELECT COUNT(*) as count FROM products WHERE category_id = ?', [id]);
+    if (parseInt(inUse.count, 10) > 0) {
+      return res.status(400).json({
+        error: `This category still holds ${inUse.count} product(s). Move or delete them first.`
+      });
+    }
+    await runQuery('DELETE FROM categories WHERE id = ?', [id]);
+    res.json({ message: 'Category deleted' });
+  } catch (error) {
+    console.error('Delete category error:', error);
+    res.status(500).json({ error: 'Failed to delete category' });
   }
 });
 
@@ -110,13 +328,15 @@ router.post('/products', async (req, res) => {
       salePrice,
       is_featured ? 1 : 0,
       is_bestseller ? 1 : 0,
-      gender || 'Unisex',
-      concentration || 'Extrait de Parfum',
+      // Fragrance-only fields are stored exactly as given (blank stays blank)
+      // so non-perfume items don't inherit misleading perfume defaults.
+      gender || '',
+      concentration || '',
       top_notes || '',
       heart_notes || '',
       base_notes || '',
-      longevity || '12+ Hours',
-      sillage || 'Intense',
+      longevity || '',
+      sillage || '',
       image_url || '/images/oud_royal.jpg',
       JSON.stringify(
         Array.isArray(gallery) && gallery.length > 0
@@ -142,9 +362,9 @@ router.post('/products', async (req, res) => {
         }
         seen.add(key);
         await runQuery(`
-          INSERT INTO variants (product_id, size_label, price, sku, stock_quantity)
-          VALUES (?, ?, ?, ?, ?)
-        `, [productId, sizeLabel, vPrice, v.sku || `KTZ-${productId}-${sizeLabel.replace(/\s+/g, '')}`, Math.max(0, parseInt(v.stock_quantity, 10) || 50)]);
+          INSERT INTO variants (product_id, size_label, price, sku, stock_quantity, cost_price)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [productId, sizeLabel, vPrice, v.sku || `KTZ-${productId}-${sizeLabel.replace(/\s+/g, '')}`, Math.max(0, parseInt(v.stock_quantity, 10) || 50), Math.max(0, Number(v.cost_price) || 0)]);
       }
     } else {
       // Default variant — priced at the effective (offer) price so the shop
@@ -232,8 +452,8 @@ router.put('/products/:id', async (req, res) => {
       WHERE id = ?
     `, [
       title, finalSlug, subtitle || '', description || '', category_id, basePrice, salePrice,
-      gender || 'Unisex', concentration || 'Extrait de Parfum', top_notes || '', heart_notes || '', base_notes || '',
-      longevity || '12+ Hours', sillage || 'Intense', image_url, galleryJson, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
+      gender || '', concentration || '', top_notes || '', heart_notes || '', base_notes || '',
+      longevity || '', sillage || '', image_url, galleryJson, is_featured ? 1 : 0, is_bestseller ? 1 : 0, id
     ]);
 
     // Variant price sync — keeps the shop from ever showing a stale price.
@@ -258,20 +478,21 @@ router.put('/products/:id', async (req, res) => {
         const sizeLabel = (v.size_label || '').trim();
         const vPrice = Number(v.price);
         const vStock = Math.max(0, parseInt(v.stock_quantity, 10) || 0);
+        const vCost = Math.max(0, Number(v.cost_price) || 0);
         if (!sizeLabel || Number.isNaN(vPrice) || vPrice <= 0) {
           return res.status(400).json({ error: 'Every size needs a name and a price greater than 0' });
         }
         if (v.id) {
           await runQuery(
-            `UPDATE variants SET size_label = ?, price = ?, stock_quantity = ? WHERE id = ? AND product_id = ?`,
-            [sizeLabel, vPrice, vStock, v.id, id]
+            `UPDATE variants SET size_label = ?, price = ?, stock_quantity = ?, cost_price = ? WHERE id = ? AND product_id = ?`,
+            [sizeLabel, vPrice, vStock, vCost, v.id, id]
           );
           keepIds.push(v.id);
         } else {
           const ins = await runQuery(
-            `INSERT INTO variants (product_id, size_label, price, sku, stock_quantity)
-             VALUES (?, ?, ?, ?, ?)`,
-            [id, sizeLabel, vPrice, `KTZ-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), vStock]
+            `INSERT INTO variants (product_id, size_label, price, sku, stock_quantity, cost_price)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, sizeLabel, vPrice, `KTZ-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(), vStock, vCost]
           );
           keepIds.push(ins.lastID);
         }
@@ -618,6 +839,149 @@ router.delete('/ads/:id', async (req, res) => {
     res.json({ message: 'Ad deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete ad' });
+  }
+});
+
+// 7a. Email health check — sends a real alert to the configured recipients and
+// reports exactly what the email provider said. Exists because a failed alert
+// used to be invisible: a boolean was swallowed and nothing was logged.
+router.post('/test-email', async (req, res) => {
+  try {
+    const recipients = await resolveAlertRecipients();
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: 'No alert recipient is configured' });
+    }
+
+    const sample = {
+      order_number: 'KTZ-TEST',
+      customer_name: 'Test Customer',
+      customer_email: 'test@example.com',
+      phone: '9999999999',
+      shipping_address: 'Test email from the KATHRAZ admin dashboard — no action needed.',
+      payment_method: 'COD',
+      payment_status: 'Pending',
+      subtotal: 0,
+      discount_amount: 0,
+      shipping_fee: 0,
+      total_amount: 0,
+    };
+    const site = (process.env.PUBLIC_SITE_URL || '').replace(/\/$/, '');
+    const mail = newOrderAlertEmail({
+      order: sample,
+      items: [],
+      adminUrl: site ? `${site}/admin` : '',
+    });
+
+    const result = await sendEmailWithResult({
+      to: recipients,
+      subject: `[TEST] ${mail.subject}`,
+      html: mail.html,
+      text: `This is a test alert from your KATHRAZ admin dashboard.\n\n${mail.text}`,
+    });
+
+    res.json({
+      sent: result.ok,
+      recipients: result.recipients,
+      sender: result.sender,
+      configured: result.configured,
+      provider_status: result.status,
+      provider_message: result.providerMessage,
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ error: 'Failed to send test email' });
+  }
+});
+
+// 7b. Expense Tracking — everything the store spends to run (rent, ads,
+// packaging, salaries …). Net profit = gross profit - these expenses.
+const EXPENSE_CATEGORIES = ['General', 'Purchase / Stock', 'Marketing & Ads', 'Packaging', 'Shipping', 'Rent', 'Salaries', 'Utilities', 'Other'];
+
+// List every logged expense, newest first
+router.get('/expenses', async (req, res) => {
+  try {
+    const expenses = await allQuery(`
+      SELECT e.*, u.name as created_by_name
+      FROM expenses e
+      LEFT JOIN users u ON e.created_by = u.id
+      ORDER BY e.expense_date DESC, e.id DESC
+    `);
+    const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    res.json({ expenses, total, categories: EXPENSE_CATEGORIES });
+  } catch (error) {
+    console.error('Fetch expenses error:', error);
+    res.status(500).json({ error: 'Failed to fetch expenses' });
+  }
+});
+
+// Log a new expense
+router.post('/expenses', async (req, res) => {
+  try {
+    const { title, category, amount, expense_date, notes } = req.body;
+    const cleanTitle = String(title || '').trim();
+    const value = Number(amount);
+    if (!cleanTitle) {
+      return res.status(400).json({ error: 'A description is required' });
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    const result = await runQuery(`
+      INSERT INTO expenses (title, category, amount, expense_date, notes, created_by)
+      VALUES (?, ?, ?, COALESCE(?, CURRENT_DATE), ?, ?)
+    `, [cleanTitle, String(category || 'General').trim(), value, expense_date || null, notes || '', req.user.id]);
+
+    const expense = await getQuery('SELECT * FROM expenses WHERE id = ?', [result.lastID]);
+    res.status(201).json({ message: 'Expense added', expense });
+  } catch (error) {
+    console.error('Create expense error:', error);
+    res.status(500).json({ error: 'Failed to add expense' });
+  }
+});
+
+// Edit an expense
+router.put('/expenses/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await getQuery('SELECT * FROM expenses WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const { title, category, amount, expense_date, notes } = req.body;
+    const cleanTitle = String(title ?? existing.title).trim();
+    const value = amount === undefined ? Number(existing.amount) : Number(amount);
+    if (!cleanTitle) {
+      return res.status(400).json({ error: 'A description is required' });
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    await runQuery(`
+      UPDATE expenses
+      SET title = ?, category = ?, amount = ?, expense_date = COALESCE(?, expense_date), notes = ?
+      WHERE id = ?
+    `, [cleanTitle, String(category ?? existing.category ?? 'General').trim(), value, expense_date || null, notes ?? existing.notes ?? '', id]);
+
+    const expense = await getQuery('SELECT * FROM expenses WHERE id = ?', [id]);
+    res.json({ message: 'Expense updated', expense });
+  } catch (error) {
+    console.error('Update expense error:', error);
+    res.status(500).json({ error: 'Failed to update expense' });
+  }
+});
+
+// Delete an expense
+router.delete('/expenses/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await runQuery('DELETE FROM expenses WHERE id = ?', [id]);
+    res.json({ message: 'Expense deleted' });
+  } catch (error) {
+    console.error('Delete expense error:', error);
+    res.status(500).json({ error: 'Failed to delete expense' });
   }
 });
 
